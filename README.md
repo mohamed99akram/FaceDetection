@@ -56,7 +56,71 @@ getFeatureValue(ii,f)
 - this value is considered the threshold for the current feature
 - we use pytorch to sort and accumulate the weights and find the minimum on the axis=1 to use GPU and make it faster
 - Our weak classifier is the threshold and the polarity. if given a new image, it will compute this feature for the image, compare with the threshold and based on the polarity, will decide whether it is a face or not
-- The returned value is the index of the feature (index of the row) that gives overall minimum sum of weights of misclassified images (minimum error) and the threshold for that feature and the polarity
+- The returned value is the index of the feature (index of the row) that gives overall minimum sum of weights of misclassified images (minimum error) and the threshold for that feature and the polarity and the error
+  
+
+Example:
+<!-- add drop down with html, default: open-->
+
+<details open> 
+<summary>Example</summary>
+
+```python
+f = array([[6, 9, 0, 1, 6],
+       [5, 1, 2, 5, 4],
+       [8, 5, 5, 8, 4],
+       [0, 9, 2, 7, 5],
+       [0, 4, 9, 9, 7]])
+w = array([0.2, 0.2, 0.2, 0.2, 0.2])
+labels = array([0,1,1,0,0])
+```
+
+1. sort the features by value, axis=1, each row will have labels sorted by feature value
+```python
+f = array([[0, 1, 6, 6, 9],
+       [1, 2, 4, 5, 5],
+       [4, 5, 5, 8, 8],
+       [0, 2, 5, 7, 9],
+       [0, 4, 7, 9, 9]])
+labels= array([[1, 0, 0, 0, 1],
+        [1, 1, 0, 0, 0],
+        [0, 1, 1, 0, 0],
+        [0, 1, 1, 0, 0],
+        [0, 1, 0, 0, 1]
+])
+```
+2. accumulate the weights of misclassifications on the axis=1;
+```python
+#! Not Sure if this is correct, but, yOu GeT tHe iDeA
+# left is negative, right is positive
+w1 = array([[0.2, 0.2, 0.2, 0.2, 0.4],
+       [0.2, 0.4, 0.4, 0.4, 0.4],
+       [0, 0.2, 0.4, 0.4, 0.4],
+       [0, 0.2, 0.4, 0.4, 0.4],
+       [0, 0.2, 0.2, 0.2, 0.4]])
+# left is positive, right is negative - accumulative from the right:
+w2 = array([[0.6, 0.6, 0.4, 0.2, 0],
+       [0.6, 0.6, 0.6, 0.4, 0.2],
+       [0.6, 0.4, 0.4, 0.4, 0.2],
+       [0.6, 0.4, 0.4, 0.4, 0.2],
+       [0.6, 0.4, 0.4, 0.2, 0]])
+```
+
+3. find the index where the sum of `w1` and `w2` is minimum, axis=1
+```python
+w_sum = w1 + w2
+w_sum = array([[0.8, 0.8, 0.6, 0.4, 0.4],
+       [0.8, 1, 1, 0.8, 0.6],
+       [0.6, 0.6, 0.8, 0.8, 0.6],
+       [0.6, 0.6, 0.8, 0.8, 0.6],
+       [0.6, 0.6, 0.6, 0.4, 0.4]])
+best_f_index = array([3, 4, 0, 0, 0])
+```
+4. those indecies are the thresholds, repeat for reversed polarity, choose best threshold, polarity and error
+
+
+
+</details>
 
 # feat_desc.ipynb  
 This is just a test file for the features_description.py, it compares its output with other implementations of the same features
