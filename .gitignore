@@ -1,3 +1,4 @@
 __pycache__
-all_features.*
+*.np*
 .unotes/
+.ipynb_checkpoints/
