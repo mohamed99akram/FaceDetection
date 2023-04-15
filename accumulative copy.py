@@ -29,9 +29,9 @@ class WeakClassifier():
     """
     Weak classifier
     Chooses a feature and a threshold to classify the data
-    X: features matrix of shape (n_features, n_samples): float32
+    X: features matrix of shape (n_features, n_samples)
     y: labels vector of shape (n_samples,): either 0 or 1
-    weights: weights vector of shape (n_samples,): they are positive and sum to 1: float32
+    weights: weights vector of shape (n_samples,): they are positive and sum to 1
     batchsize: batchsize for dataloader
     show_time: show time for each step
     show_mem: show memory for each step
@@ -46,9 +46,6 @@ class WeakClassifier():
                   batchsize, 
                   show_time=False, 
                   show_mem=False,
-                  debug=False,
-                  delete_unused=False,  
-                  getClassifier=False,
                   delta=0.00001):
 
         #+ Device
@@ -56,9 +53,6 @@ class WeakClassifier():
         self.show_time = show_time
         self.show_mem = show_mem
         self.delta = delta
-        self.debug = debug
-        self.delete_unused = delete_unused
-        self.getClassifier = getClassifier
 
         # self.X = X
         #+ Dataset
@@ -70,22 +64,9 @@ class WeakClassifier():
             self.y = torch.tensor(y).type(torch.float32).to(self.device)
         # X
         if type(X) == torch.Tensor:
-            # if X is not float32, convert it to float32 then don't copy, put in tensor
-            if X.dtype != torch.float32:
-                X = X.type(torch.float32)
-                self.X = X
+            self.X = X.type(torch.float32)
         else:
-            if type(X) == np.ndarray:
-                # if X is not float32, convert it to float32 then don't copy, put in tensor
-                if X.dtype != np.float32:
-                    X = X.astype(np.float32)
-                    self.X = torch.from_numpy(X)
-                else:
-                    self.X = torch.from_numpy(X)
-
-            else:
-                raise TypeError('X should be either torch.Tensor or np.ndarray')
-
+            self.X = torch.tensor(X).type(torch.float32)
 
         self.dataset = WeakClassifier._FeaturesDataset(self.X)
         self.dataloader = DataLoader(dataset=self.dataset, batch_size=batchsize, num_workers=2)
@@ -117,10 +98,7 @@ class WeakClassifier():
 
         overall_index = 0
         LW, RW = [], []
-        print("Starting to choose classifier")
         for index, X in enumerate(self.dataloader):
-
-            xshape = X.shape
 
             if self.show_time:
                 print('At batch number: ', index, ':', ' Start time: ', time.time() - s_t)
@@ -130,15 +108,17 @@ class WeakClassifier():
             if self.show_mem:
                 print('Memory for batch: ', self._mem())
             
-            min_error, best_feature, best_threshold, best_polarity = float('inf'), 0, 0, 0
+
+            min_error = torch.tensor([float('inf')]*X.shape[0],device=self.device)
+            best_feature = torch.zeros((X.shape[0], 2), device=self.device)
+            best_threshold = torch.zeros(X.shape[0], device=self.device)
+            best_polarity = torch.zeros(X.shape[0], device=self.device)
 
             #+ repeats the weights and labels for each feature (each row of X)
             weights2d = torch.tile(self.weights, (X.shape[0], 1))
-            # if self.delete_unused:
-            #     del self.weights
+            # del weights
             y2d = torch.tile(self.y, (X.shape[0], 1))
-            # if self.delete_unused:
-            #     del self.y
+            # del y
 
             #+ sort features, labels, weights by corresponding features (sort each row of X)
             sorting_indecies = torch.argsort(X, stable=True)
@@ -146,75 +126,56 @@ class WeakClassifier():
 
             #+ s_w: srorted weights, s_f: sorted features, s_y: sorted labels
             s_w = weights2d[idx0, sorting_indecies] #% (n_features_sub, n_samples)
-            if self.delete_unused:
-                del weights2d
+            # del weights2d
             s_f = X[idx0, sorting_indecies] #% (n_features_sub, n_samples)
-            if self.delete_unused:
-                del X
+            # del X
             s_y = y2d[idx0, sorting_indecies] #% (n_features_sub, n_samples)
-            if self.delete_unused:
-                del y2d
-                del idx0
+            # del y2d
+            # del idx0
 
             if self.show_mem:
                 self._mem()
 
-            # for left, right in [(0, 1), (1, 0)]:  # @ y: 0 or 1
-            left, right = 0, 1
+            # for left, right in [(-1, 1), (1, -1)]:  # @ y: -1 or 1
+            for left, right in [(0, 1), (1, 0)]:  # @ y: 0 or 1
 
-            #+ left_weights, right_weights: accumulative weights for each feature (each row of X) left and right
-            left_weights = self._accW_left(s_w, s_y, left) #% (n_features_sub, n_samples + 1)
-            right_weights = self._accW_right(s_w, s_y, right) #% (n_features_sub, n_samples + 1)
+                #+ left_weights, right_weights: accumulative weights for each feature (each row of X) left and right
+                left_weights = self._accW_left(s_w, s_y, left)
+                right_weights = self._accW_right(s_w, s_y, right)
 
-            error = left_weights + right_weights #% (n_features_sub, n_samples + 1)
-
-            #+ pol_bool: if error < 0.5: polarity = left_, else: polarity = right
-            pol_bool = error < 0.5 #% (n_features_sub, n_samples + 1)
-
-            polarity = torch.where(pol_bool, torch.tensor(left, device=self.device), torch.tensor(right, device=self.device)) #% (n_features_sub, n_samples + 1)
-            polarity[polarity == 0] = -1
-
-            #+ error = error if error < 0.5 else 1 - error: reversed polarity
-            error = torch.where(pol_bool, error, 1 - error) #% (n_features_sub, n_samples + 1)
-            
-            #@ idx: index of the feature that has the minimum error
-            idx = torch.argmin(error, axis=1) #% (n_features_sub,)
-            
-            #+ if out of range, set to 0: all misclassified, ∑w_l = 0, ∑w_r = ∑w is equivalent to ∑w_l = ∑w, ∑w_r = 0 with reversed polarity
-            tmp_bool = idx >= s_f.shape[1]
-            idx[tmp_bool] = 0
-            # reverse bool
-            pol_bool[tmp_bool] = ~pol_bool[tmp_bool]
-            polarity[tmp_bool] = -1 if left == 0 else 1
-
-
-            ii1 = torch.arange(idx.shape[0], device=self.device) #% same as idx0? (n_features_sub,)
-
-            selected_features = s_f[ii1, idx] #% (n_features_sub,)
-    
-            best_threshold = s_f[ii1, idx] - self.delta #% (n_features_sub,)
-            # best_threshold = (s_f[ii1, idx] + s_f[ii1, idx + 1]) / 2 #% (n_features_sub,)
-            best_polarity = polarity[ii1, idx] #% (n_features_sub,)
-            min_error = error[ii1, idx] #% (n_features_sub,) 
-
-
-            #+ for debugging
-            if self.debug:
                 LW.append(left_weights)
                 RW.append(right_weights)
-                LW.append(self._accW_left(s_w, s_y, right))
-                RW.append(self._accW_right(s_w, s_y, left))
-            else:
-                LW = torch.tensor([0.25, 0.25])
-                RW = torch.tensor([0.25, 0.25])
+
+                #+ idx: index of the feature that has the minimum error
+                idx = torch.argmin(left_weights + right_weights, axis=1) #% (n_features_sub,)
+                # seems problamtic
+                idx[idx >= s_f.shape[1]] = s_f.shape[1] - 1
+                ii1 = torch.arange(idx.shape[0], device=self.device) #% same as idx0? (n_features_sub,)
+
+                #+ min_error = min(left_weights + right_weights, min_error)
+                cur_min_error = left_weights[ii1, idx] + right_weights[ii1, idx] #% (n_features_sub,)
+                temp_bool = cur_min_error < min_error #% (n_features_sub,)
+                if temp_bool.any().item():
+                    min_error[temp_bool] = cur_min_error[temp_bool] #% (n_features_sub,)
+
+                    selected_idx = idx[temp_bool] #% (only better indeces,)
+
+                    selected_features = s_f[ii1[temp_bool], selected_idx] #% (n_features_sub,) => update only better indecies
+
+                    #???? USELESS LINE ?????
+                    # best_feature[temp_bool] = torch.tensor(
+                    #     list(zip(selected_idx, selected_features)), device=self.device) #% (n_features_sub, 2) => update only better indecies
+                    best_feature[temp_bool] = torch.cat((selected_idx.reshape(-1, 1), selected_features.reshape(-1, 1)), axis=1)
+
+                    best_threshold[temp_bool] = s_f[ii1[temp_bool], idx[temp_bool]] - self.delta  #% (n_features_sub,) => update only better indecies
+                    # best_polarity[temp_bool] = left  #% (n_features_sub,) => update only better indecies
+                    best_polarity[temp_bool] = -1 if left == 0 else 1  #% (n_features_sub,) => update only better indecies
+                    # best_polarity[temp_bool] = 1 if left == 0 else -1  #% (n_features_sub,) => update only better indecies
+                
+            # + add to classifiers4, converted to numpy
+            classifiers4.extend([OneClassifier(*clf4) for clf4 in zip(best_feature[:, 0],
+                                best_feature[:, 1], best_threshold, best_polarity, min_error)]) 
             
-            if self.getClassifier:
-                best_feature = torch.cat((idx.reshape(-1,1), selected_features.reshape(-1, 1)), axis=1) #% (n_features_sub, 2)
-                # + add to classifiers4, converted to numpy
-                classifiers4.extend([OneClassifier(*clf4) for clf4 in zip(best_feature[:, 0].cpu(),
-                                best_feature[:, 1].cpu(), best_threshold.cpu(), best_polarity.cpu(), min_error.cpu())])
-
-
             #+ select overall best classifier
             current_best_best_error_index = torch.argmin(min_error)
             if min_error[current_best_best_error_index] < best_best_error:
@@ -223,20 +184,13 @@ class WeakClassifier():
                 best_best_polarity = best_polarity[current_best_best_error_index]
                 best_best_error = min_error[current_best_best_error_index]
 
-            overall_index += xshape[0]
+            overall_index += X.shape[0]
 
 
         if self.show_time:
             print("Time taken: %f seconds" % (time.time() - s_t))
 
-        # convert to cpu
-        best_best_threshold = best_best_threshold.cpu()
-        best_best_polarity = best_best_polarity.cpu()
-        best_best_error = best_best_error.cpu()
-
         return best_best_index, best_best_threshold, best_best_polarity, best_best_error, classifiers4, LW, RW
-
-    #########################################################################################################################
 
     def _accW_left(self, s_w, s_y, left):
         zero_col = torch.zeros((s_w.shape[0], 1), device=self.device) #% (n_features_sub, 1)
