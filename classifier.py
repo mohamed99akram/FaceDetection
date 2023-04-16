@@ -6,6 +6,16 @@ import torch
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from typing import List, Tuple
+
+def EQ(x, y, permittivity=1e-6):
+    return np.abs(x - y) < permittivity
+def EQ3(x, y, z, permittivity=1e-4):
+    return EQ(x, y, permittivity) and EQ(y, z, permittivity)
+def OK(msg='OK'):
+    print("\033[32m{}\033[0m".format(msg))
+def NOK(msg='Not Equal'):
+    print("\033[31m{}\033[0m".format(msg))
+
 class WeakClassifier():
     """
     Weak classifier
@@ -77,6 +87,7 @@ class BestClassifier():
       delta: to take threshold below feature value -> θ = f - δ
     
     TODO: consider taking (f_i+1 + f_i) / 2 as threshold
+    TODO: X is passed multiple times, copied multiple times. how to handle this?
     """
     def __init__(self,
                   X:torch.Tensor or np.ndarray,
@@ -88,7 +99,8 @@ class BestClassifier():
                   debug=False,
                   delete_unused=False,  
                   getClassifier=False,
-                  delta=0.00001):
+                  delta=0.00001,
+                  verbose=False):
 
         #+ Device
         self.device = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
@@ -98,7 +110,7 @@ class BestClassifier():
         self.debug = debug
         self.delete_unused = delete_unused
         self.getClassifier = getClassifier
-        
+        self.verbose=verbose
         self.f_idx = None # feature index
         self.θ = None # threshold
         self.p = None # polarity
@@ -165,7 +177,8 @@ class BestClassifier():
 
         overall_index = 0
         LW, RW = [], []
-        print("Starting to choose classifier")
+        if self.verbose:
+            print("Starting to choose classifier")
         for index, X in enumerate(self.dataloader):
 
             xshape = X.shape

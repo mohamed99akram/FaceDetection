@@ -2,3 +2,7 @@ __pycache__
 *.np*
 .unotes/
 .ipynb_checkpoints/
+*.pkl
+*.last
+test_classifier copy.ipynb
+StrongClassifier/
