@@ -3,6 +3,7 @@ __pycache__
 .unotes/
 .ipynb_checkpoints/
 *.pkl
+!cascadeClassifier.pkl
 *.last
 test_classifier copy.ipynb
 StrongClassifier/
