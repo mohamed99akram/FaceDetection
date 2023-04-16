@@ -5,45 +5,84 @@ import time
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
+from typing import List, Tuple
+class WeakClassifier():
+    """
+    Weak classifier
+    feature_index: index of feature
+    threshold: threshold of feature
+    polarity: polarity of feature
+    error: error of feature
+    """
+    def __init__(self, feature_index, threshold, polarity, error):
+        # convert to cpu if tensors, convert to numbers if tensors
+        self.f_idx = feature_index.cpu().numpy() if type(feature_index) == torch.Tensor else feature_index
+        self.θ = threshold.cpu().numpy() if type(threshold) == torch.Tensor else threshold
+        self.p = polarity.cpu().numpy() if type(polarity) == torch.Tensor else polarity
+        self.ϵ = error.cpu().numpy() if type(error) == torch.Tensor else error
+        
+        
+    @property
+    def feature_index(self): return self.f_idx
+    @property
+    def threshold(self): return self.θ
+    @property
+    def polarity(self): return self.p
+    @property
+    def error(self): return self.ϵ
+    
+    def predict(self, X, f_given=False):
+        """
+        Predicts the class of the given data X
 
-class OneClassifier:
-    def __init__(self, feature_index, feature_val, threshold, polarity, error):
-        self.feature_index = feature_index
-        self.feature_val = feature_val
-        self.threshold = threshold
-        self.polarity = polarity
-        self.error = error
+        :param X: data to predict (n_features, n_samples) or (n_samples,) if f_given
+        :param f_given: if True, X is the feature vector (n_samples,) 
+                        else X is the whole data matrix (n_features, n_samples)
+        
+        :return: predicted class (n_samples,): 1 or 0
+        """
+        if self.f_idx is None or self.θ is None or self.p is None or self.ε is None:
+            raise Exception("Please Call chooseClassifier() first")
+        # 1 if data[best_index] * best_polarity <= best_threshold * best_polarity else 0 as numpy
+        if f_given:
+            return np.where(X * self.p <= self.θ * self.p, 1, 0)
+        return np.where(X[self.f_idx] * self.p <= self.θ * self.p, 1, 0)
 
     # make a function for easier access as numpy array, example: np.array(wc)
     def __array__(self):
         # return tensor.cpu() if members are tensors else np.array
         if type(self.feature_index) == torch.Tensor:
-            return np.array([self.feature_index.cpu().numpy(), self.feature_val.cpu().numpy(), self.threshold.cpu().numpy(), self.polarity.cpu().numpy(), self.error.cpu().numpy()])
+            return np.array([self.feature_index.cpu().numpy(), self.threshold.cpu().numpy(), self.polarity.cpu().numpy(), self.error.cpu().numpy()])
         else:
-            return np.array([self.feature_index, self.feature_val, self.threshold, self.polarity, self.error])
+            return np.array([self.feature_index, self.threshold, self.polarity, self.error])
 
     def __str__(self):
         return np.array(self).__str__()
 
-class WeakClassifier():
+class BestClassifier():
     """
     Weak classifier
     Chooses a feature and a threshold to classify the data
-    X: features matrix of shape (n_features, n_samples): float32
-    y: labels vector of shape (n_samples,): either 0 or 1
-    weights: weights vector of shape (n_samples,): they are positive and sum to 1: float32
-    batchsize: batchsize for dataloader
-    show_time: show time for each step
-    show_mem: show memory for each step
-    delta: to take threshold below feature value -> θ = f - δ
-
+    
+    input: 
+      X: features matrix of shape (n_features, n_samples): float32
+      y: labels vector of shape (n_samples,): either 0 or 1
+      weights: weights vector of shape (n_samples,): they are positive and sum to 1: float32
+      batchsize: batchsize for dataloader
+      show_time: show time for each step
+      show_mem: show memory for each step
+      debug: show debug info (LW, RW)
+      delete_unused: delete unused variables to save memory
+      getClassifier: return classifier of each feature
+      delta: to take threshold below feature value -> θ = f - δ
+    
     TODO: consider taking (f_i+1 + f_i) / 2 as threshold
     """
     def __init__(self,
                   X:torch.Tensor or np.ndarray,
                   y:torch.Tensor or np.ndarray,
                   weights: torch.Tensor or np.ndarray,
-                  batchsize, 
+                  batchsize=200, 
                   show_time=False, 
                   show_mem=False,
                   debug=False,
@@ -59,6 +98,12 @@ class WeakClassifier():
         self.debug = debug
         self.delete_unused = delete_unused
         self.getClassifier = getClassifier
+        
+        self.f_idx = None # feature index
+        self.θ = None # threshold
+        self.p = None # polarity
+        self.ϵ = None # error
+
 
         # self.X = X
         #+ Dataset
@@ -87,7 +132,7 @@ class WeakClassifier():
                 raise TypeError('X should be either torch.Tensor or np.ndarray')
 
 
-        self.dataset = WeakClassifier._FeaturesDataset(self.X)
+        self.dataset = BestClassifier._FeaturesDataset(self.X)
         self.dataloader = DataLoader(dataset=self.dataset, batch_size=batchsize, num_workers=2)
         self.batchsize = batchsize
         if type(weights) == torch.Tensor:
@@ -96,7 +141,7 @@ class WeakClassifier():
             self.weights = torch.tensor(weights).type(torch.float32).to(self.device)
             
 
-    def chooseClassifier(self):
+    def chooseClassifier(self) -> Tuple[WeakClassifier, Tuple[List[WeakClassifier], torch.Tensor, torch.Tensor]]:
         """
         Chooses a classifier
         Returns:
@@ -104,6 +149,9 @@ class WeakClassifier():
             best_threshold: threshold of the feature
             best_polarity: polarity of the feature
             best_error: error of the feature
+            classifiers4: classifiers for each feature, useful if getClassifier is True
+            LW: left weights useful if debug is True
+            RW: right weights useful if debug is True
         """
         
         s_t = time.time()
@@ -209,10 +257,10 @@ class WeakClassifier():
                 RW = torch.tensor([0.25, 0.25])
             
             if self.getClassifier:
+                # TODO delete selected_features from this - delete this and only use idx
                 best_feature = torch.cat((idx.reshape(-1,1), selected_features.reshape(-1, 1)), axis=1) #% (n_features_sub, 2)
                 # + add to classifiers4, converted to numpy
-                classifiers4.extend([OneClassifier(*clf4) for clf4 in zip(best_feature[:, 0].cpu(),
-                                best_feature[:, 1].cpu(), best_threshold.cpu(), best_polarity.cpu(), min_error.cpu())])
+                classifiers4.extend([WeakClassifier(*clf4) for clf4 in zip(best_feature[:, 0].cpu(), best_threshold.cpu(), best_polarity.cpu(), min_error.cpu())])
 
 
             #+ select overall best classifier
@@ -234,9 +282,38 @@ class WeakClassifier():
         best_best_polarity = best_best_polarity.cpu()
         best_best_error = best_best_error.cpu()
 
-        return best_best_index, best_best_threshold, best_best_polarity, best_best_error, classifiers4, LW, RW
+        self.f_idx = best_best_index
+        self.θ = best_best_threshold
+        self.p = best_best_polarity
+        self.ε = best_best_error
+        if self.delete_unused:
+            del self.X
+            del self.y
+            del self.weights
+
+        return WeakClassifier(best_best_index, best_best_threshold, best_best_polarity, best_best_error), (classifiers4, LW, RW)
 
     #########################################################################################################################
+
+    def predict(self, X=None, f_given=False):
+        """
+        Predicts the class of the given data X
+
+        :param X: data to predict (n_features, n_samples) or (n_samples,) if f_given
+        :param f_given: if True, X is the feature vector (n_samples,) 
+                        else X is the whole data matrix (n_features, n_samples)
+
+        :return: predicted class (n_samples,): 1 or 0
+        """
+        if X is None:
+            X = self.X.numpy()
+
+        if self.f_idx is None or self.θ is None or self.p is None or self.ε is None:
+            raise Exception("Please Call chooseClassifier() first")
+        # 1 if data[best_index] * best_polarity <= best_threshold * best_polarity else 0 as numpy
+        if f_given:
+            return np.where(X * self.p <= self.θ * self.p, 1, 0)
+        return np.where(X[self.f_idx] * self.p <= self.θ * self.p, 1, 0)
 
     def _accW_left(self, s_w, s_y, left):
         zero_col = torch.zeros((s_w.shape[0], 1), device=self.device) #% (n_features_sub, 1)
