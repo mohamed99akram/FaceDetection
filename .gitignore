@@ -7,3 +7,4 @@ __pycache__
 *.last
 test_classifier copy.ipynb
 StrongClassifier/
+temp/
