@@ -33,12 +33,13 @@ class FeatureExtractor:
     percentile: percentile of features to be selected
     batch_size: batch size for feature extraction
     """
-    def __init__(self, shape, percentile=None, batch_size=500):
+    def __init__(self, shape, percentile=10, batch_size=500, device=None, verbose=True):
         self.shape = shape
         self.percentile = percentile
         self.batch_size = batch_size
         self.f2, self.f3, self.f4 = self.describe_features(shape)
-        
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") if device is None else device
+        self.verbose = verbose
 
     def describe_features(self, shape):
         """
@@ -142,9 +143,6 @@ class FeatureExtractor:
                         pos_path, 
                         neg_path, 
 
-                        indecies=None, 
-                        cascadeClassifier: CascadeClassifier=None,
-
                         saveAllto='all_features.npz',
                         saveYto='labels.npy',
                         saveIndeciesto='indecies.npy',
@@ -155,15 +153,127 @@ class FeatureExtractor:
 
         pos_path: path to positive images
         neg_path: path to negative images
-        indecies: indecies of features to extract (coming from trained model after selectPercentile())
+        
         saveAllto: path to save features
         saveYto: path to save labels
         saveIndeciesto: path to save indecies of selected features
         saveSelectedto: path to save selected features
 
-        return X matrix (n_features, n_images), y vector (n_images)
+        return 
+        X matrix (n_features, n_images), 
+        y vector (n_images)
+        indecies of selected features
+        selected percentile of features
         """
-        pass
+        dataset = self.get_dataset(pos_path, neg_path)
+        dataset_ii = self.getIntegralImage(dataset[0]), dataset[1]
+        all_features = self.getFeaturesFromDesc(self.f2, self.f3, self.f4, dataset_ii)
+        if self.verbose:
+            print('all_features shape:', all_features.shape)
+            print('Now, saving all features to', saveAllto)
+
+        np.savez_compressed(saveAllto, all_features)
+        np.save(saveYto, dataset[1])
+
+        if self.verbose:
+            print('Now selecting percentile features')
+        
+        indecies = None
+        if saveSelectedto is not None:
+            indecies, selectedPercentile = self.selectPercentile(X=all_features, 
+                                             y=dataset[1], 
+                                             percentile=self.percentile,
+                                             saveIndeciesTo=saveIndeciesto, 
+                                             saveFeaturesTo=saveSelectedto)
+
+        return all_features, dataset[1], indecies, selectedPercentile
+
+
+    def get_dataset(self, pos_path, neg_path):
+        """
+          return np array of (img, label)
+        """
+        pos_img_names = os.listdir(pos_path)
+        neg_img_names = os.listdir(neg_path)
+        for i in range(len(pos_img_names)):
+            pos_img_names[i] = os.path.join(pos_path, pos_img_names[i])
+        for i in range(len(neg_img_names)):
+            neg_img_names[i] = os.path.join(neg_path, neg_img_names[i])
+
+        pos_img_names = np.array(pos_img_names)
+        neg_img_names = np.array(neg_img_names)
+    
+        imgs, labels = [], []
+        for i in range(len(pos_img_names)):
+            img = cv2.imread(pos_img_names[i], 0)
+            img = cv2.resize(img, self.shape)
+            imgs.append(img)
+            labels.append(1)
+        for i in range(len(neg_img_names)):
+            img = cv2.imread(neg_img_names[i], 0)
+            img = cv2.resize(img, self.shape)
+            imgs.append(img)
+            # labels.append(-1)
+            labels.append(0)
+        return np.array(imgs), np.array(labels)
+
+
+    def getFeaturesFromDesc(self, f2, f3, f4, dataset_ii):
+        """
+        f2: descriptions of 2-rect features
+        f3: descriptions of 3-rect features
+        f4: descriptions of 4-rect features
+        dataset_ii: integral images of dataset
+        """
+        class FeatureDataset(Dataset):
+            """
+            Dataset of features
+
+            """
+            def __init__(self, f):
+                if type(f) == list or type(f) == np.ndarray:
+                    self.f = torch.from_numpy(np.array(f)).type(torch.int64)
+                else:
+                    self.f = f.type(torch.int64)
+
+            def __len__(self):
+                return self.f.shape[0]
+            def __getitem__(self, idx):
+                return self.f[idx]
+            
+        
+        f2d = FeatureDataset(f2)
+        f3d = FeatureDataset(f3)
+        f4d = FeatureDataset(f4)
+
+        f2d_loader = DataLoader(f2d, batch_size=self.batch_size)
+        f3d_loader = DataLoader(f3d, batch_size=self.batch_size)
+        f4d_loader = DataLoader(f4d, batch_size=self.batch_size)
+
+        iis = dataset_ii[0].astype(int)
+        iis = torch.from_numpy(iis).to(self.device)
+
+        ii_f2 = torch.zeros((iis.shape[0], f2.shape[0]))
+        ii_f3 = torch.zeros((iis.shape[0], f3.shape[0]))
+        ii_f4 = torch.zeros((iis.shape[0], f4.shape[0]))
+
+        for i, f2_b in enumerate(f2d_loader):
+            f2_b = f2_b.to(self.device)
+            ii_f2[:, i*self.batch_size:(i+1)*self.batch_size] = (self.getFeatureValue(iis, f2_b[:, 0]) - self.getFeatureValue(iis, f2_b[:,1])).to('cpu')
+
+        for i, f3_b in enumerate(f3d_loader):
+            f3_b = f3_b.to(self.device)
+            ii_f3[:, i*self.batch_size:(i+1)*self.batch_size] = (-self.getFeatureValue(iis, f3_b[:, 0]) + self.getFeatureValue(iis, f3_b[:,1]) - self.getFeatureValue(iis, f3_b[:,2])).to('cpu')
+
+        for i, f4_b in enumerate(f4d_loader):
+            f4_b = f4_b.to(self.device)
+            ii_f4[:, i*self.batch_size:(i+1)*self.batch_size] = (-self.getFeatureValue(iis, f4_b[:, 0]) + self.getFeatureValue(iis, f4_b[:,1]) + self.getFeatureValue(iis, f4_b[:,2]) - self.getFeatureValue(iis, f4_b[:,3])).to('cpu')
+
+        all_features = torch.cat((ii_f2, ii_f3, ii_f4), dim=1)
+        all_features = all_features.t()
+        all_features = all_features.numpy()
+        return all_features
+
 
     def extractFeaturesByIndecies(self,
                                   pos_path,
@@ -189,35 +299,40 @@ class FeatureExtractor:
                          percentile=10, 
                          X=None,
                          y=None,
-                         X_path='all_features.npz', 
-                         y_path='labels.npy', 
+                         X_file='all_features.npz', 
+                         y_file='labels.npy', 
                          saveFeaturesTo='all_features_10.npz', 
                          saveIndeciesTo='indecies.npy'):
         """
         Selects features with highest F-value
 
         percentile: percentile of features to select
-        X_path: path to features
-        y_path: path to labels
+        X_file: path to features
+        y_file: path to labels
         saveFeaturesTo: path to save selected features
         saveIndeciesTo: path to save indecies of selected features
 
-        return indecies of selected features
+        return indecies of selected features, selected_featues
 
         if file 'indecies.npy' exists, load indecies from file
         else, calculate indecies and save them to file
         """
-        if os.path.exists('indecies.npy'):
-            return np.load('indecies.npy')
+        if os.path.exists(saveIndeciesTo) and os.path.exists(saveFeaturesTo):
+            indecies = np.load(saveIndeciesTo)
+            X = np.load(saveFeaturesTo)['arr_0']
+            return indecies, X
+        
         
         if X is None or y is None:
-            X = np.load(X_path)['arr_0']
-            y = np.load(y_path)
+            if not os.path.exists(X_file) or not os.path.exists(y_file):
+                raise ValueError('X_file or y_file does not exist')
+            X = np.load(X_file)['arr_0']
+            y = np.load(y_file)
 
 
         selector = SelectPercentile(f_classif, percentile=percentile)
-        indecies = selector.fit(X, y).get_support(indices=True)
+        indecies = selector.fit(X.T, y).get_support(indices=True)
 
         np.save(saveIndeciesTo, indecies)
         np.savez(saveFeaturesTo, X[indecies])
-        return indecies
+        return indecies, X[indecies]
