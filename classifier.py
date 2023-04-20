@@ -5,7 +5,7 @@ import time
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 def EQ(x, y, permittivity=1e-6):
     return np.abs(x - y) < permittivity
@@ -32,6 +32,7 @@ class WeakClassifier():
         self.ϵ = error.cpu().numpy() if type(error) == torch.Tensor else error
         
         
+        
     @property
     def feature_index(self): return self.f_idx
     @property
@@ -41,7 +42,7 @@ class WeakClassifier():
     @property
     def error(self): return self.ϵ
     
-    def predict(self, X, f_given=False):
+    def predict(self, X, f_idx_map:Dict[int, int] = None):
         """
         Predicts the class of the given data X
 
@@ -54,8 +55,9 @@ class WeakClassifier():
         if self.f_idx is None or self.θ is None or self.p is None or self.ε is None:
             raise Exception("Please Call chooseClassifier() first")
         # 1 if data[best_index] * best_polarity <= best_threshold * best_polarity else 0 as numpy
-        if f_given:
-            return np.where(X * self.p <= self.θ * self.p, 1, 0)
+        
+        if f_idx_map is not None:
+            return np.where(X[f_idx_map[int(self.f_idx)]] * self.p <= self.θ * self.p, 1, 0)
         return np.where(X[self.f_idx] * self.p <= self.θ * self.p, 1, 0)
 
     # make a function for easier access as numpy array, example: np.array(wc)

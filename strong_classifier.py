@@ -2,19 +2,21 @@ from classifier import BestClassifier, WeakClassifier, EQ
 import numpy as np
 import torch
 import pickle as pkl
-
+from typing import Dict
 class StrongClassifier:
     def __init__(self, weak_classifiers: list[WeakClassifier], alphas: list[float]):
         self.weak_classifiers = weak_classifiers
         self.alphas = alphas
 
 
-    def predict(self, X: np.ndarray = None, f_given=False):
+    def predict(self, X: np.ndarray = None,
+                f_idx_map: Dict[int, int] = None,):
         """
         Predict given data
         
         input:
-            X: data to predict, a numpy array of shape (n_features, n_samples) or (n_samples,) if f_given is True
+            X: data to predict, a numpy array of shape (n_features, n_samples)
+            f_idx_map: f_idx_map[i] = j means that the i-th feature is the j-th feature in X
         output:
           predictions: predictions
         """
@@ -22,10 +24,10 @@ class StrongClassifier:
         # if X is None:
         #     X = self.X
             
-        predictions = np.zeros(X.shape[0]) if f_given else np.zeros(X.shape[1])
+        predictions = np.zeros(X.shape[1])
 
         for i, weak_classifier in enumerate(self.weak_classifiers):
-            predictions += self.alphas[i] * weak_classifier.predict(X, f_given=f_given)
+            predictions += self.alphas[i] * weak_classifier.predict(X, f_idx_map=f_idx_map)
         return predictions >= np.sum(self.alphas) / 2
     
     def save(self, filepath):

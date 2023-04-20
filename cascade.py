@@ -5,7 +5,7 @@ from classifier import BestClassifier, WeakClassifier
 from strong_classifier import StrongClassifierChooser, StrongClassifier
 import pickle as pkl
 import os
-
+from typing import Dict
 def _rep(n, x):
     return [x] * n
 
@@ -47,6 +47,10 @@ class CascadeClassifier:
         if os.path.exists(lastSC):
             with open(lastSC, "r") as f:
                 start = int(f.read()) + 1
+            for i in range(start):
+                with open(dirpath+f"strong_classifier_{i}.pkl", "rb") as f:
+                    self.strong_classifiers.append(pkl.load(f))
+            print(f"Continue training from layer {start + 1} / {self.n_layers}")
         
         for i in range(start, self.n_layers):
             layer = self.layers[i]
@@ -76,23 +80,30 @@ class CascadeClassifier:
         return np.sum(predictions == self.y) / self.X.shape[1]
 
 
-    def predict(self, X: np.ndarray, f_given=False):
+    def predict(self,
+                X: np.ndarray, 
+                f_idx_map: Dict[int, int] = None,):
         """
         Predict given data
         
         input:
-            X: data to predict, a numpy array of shape (n_features, n_samples) or (n_samples,) if f_given is True
+            X: data to predict, a numpy array of shape (n_features, n_samples)
+            f_idx_map: f_idx_map[i] = j means that the i-th feature is the j-th feature in X
         output:
           predictions: predictions
 
         TODO TEST THIS
         """
 
-        predictions = np.ones(X.shape[1], dtype=bool) if not f_given else np.ones(X.shape[0], dtype=bool)
+        predictions = np.ones(X.shape[1], dtype=bool)
         for strong_classifier in self.strong_classifiers:
-            if f_given:
+            # if predictions is all false, break
+            if not np.any(predictions):
+                break
+            if f_idx_map is not None:
+                # get the features that are used in this strong classifier
                 predictions[predictions] =\
-                      predictions[predictions] & strong_classifier.predict(X[predictions], f_given)
+                      predictions[predictions] & strong_classifier.predict(X[:,predictions], f_idx_map)
             else:
                 predictions[predictions] =\
                       predictions[predictions] & strong_classifier.predict(X[:, predictions])
