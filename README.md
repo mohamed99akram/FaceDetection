@@ -137,3 +137,6 @@ best_f_index = array([3, 4, 0, 0, 0])
 - ***TODO:*** if ∑w < 0.5, then reverse polarity instead of making 2 for loops
 # feat_desc.ipynb  
 This is just a test file for the features_description.py, it compares its output with other implementations of the same features
+
+# limitations
+- all features are computed, while only a few are needed
