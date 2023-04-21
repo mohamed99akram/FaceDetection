@@ -4,9 +4,35 @@ import torch
 import pickle as pkl
 from typing import Dict
 class StrongClassifier:
+    """
+    A strong classifier is a linear combination of weak classifiers
+
+    weak_classifiers: list of weak classifiers
+    alphas: list of weights of the weak classifiers
+
+    θ: threshold of the strong classifier
+    """
     def __init__(self, weak_classifiers: list[WeakClassifier], alphas: list[float]):
         self.weak_classifiers = weak_classifiers
         self.alphas = alphas
+        self.θ = np.sum(self.alphas) / 2
+
+    def confidence(self, X: np.ndarray = None, f_idx_map: Dict[int, int] = None):
+        """
+        Calculate the confidence of the strong classifier
+        input:
+            X: data to predict, a numpy array of shape (n_features, n_samples)
+            f_idx_map: f_idx_map[i] = j means that the i-th feature is the j-th feature in X
+        output:
+          confidence: confidence = (∑ αi * h(xi)), it will be compared with θ
+        """
+
+        confidence = np.zeros(X.shape[1])
+
+        for i, weak_classifier in enumerate(self.weak_classifiers):
+            confidence += self.alphas[i] * weak_classifier.predict(X, f_idx_map=f_idx_map)
+
+        return confidence
 
 
     def predict(self, X: np.ndarray = None,
@@ -20,15 +46,16 @@ class StrongClassifier:
         output:
           predictions: predictions
         """
-
-        # if X is None:
-        #     X = self.X
             
-        predictions = np.zeros(X.shape[1])
+        # predictions = np.zeros(X.shape[1]) # ∑ αi * h(xi)
 
-        for i, weak_classifier in enumerate(self.weak_classifiers):
-            predictions += self.alphas[i] * weak_classifier.predict(X, f_idx_map=f_idx_map)
-        return predictions >= np.sum(self.alphas) / 2
+        # for i, weak_classifier in enumerate(self.weak_classifiers):
+        #     predictions += self.alphas[i] * weak_classifier.predict(X, f_idx_map=f_idx_map)
+        
+        # # self.θ = np.sum(self.alphas) / 2
+        # # 1 if ∑ αi * h(xi) >= ∑ αi / 2 else 0
+        # return predictions >= np.sum(self.alphas) / 2
+        return self.confidence(X, f_idx_map=f_idx_map) >= self.θ
     
     def save(self, filepath):
         with open(filepath, "wb") as f:
