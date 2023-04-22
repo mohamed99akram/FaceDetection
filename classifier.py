@@ -293,9 +293,13 @@ class BestClassifier():
             print("Time taken: %f seconds" % (time.time() - s_t))
 
         # convert to cpu
-        best_best_threshold = best_best_threshold.cpu()
-        best_best_polarity = best_best_polarity.cpu()
-        best_best_error = best_best_error.cpu()
+        # best_best_threshold = best_best_threshold.cpu()
+        # best_best_polarity = best_best_polarity.cpu()
+        # best_best_error = best_best_error.cpu()
+        best_best_threshold = float(best_best_threshold)
+        best_best_polarity = int(best_best_polarity)
+        best_best_error = float(best_best_error)
+        
 
         self.f_idx = best_best_index
         self.θ = best_best_threshold

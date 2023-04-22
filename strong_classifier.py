@@ -91,22 +91,31 @@ class StrongClassifierChooser:
         ones = y.sum()
         zeros = self.n_samples - ones
         assert ones > 0 and zeros > 0, "No positive or negative samples"
+        # if ones == 0:
+        #     p_weight = 0
+        #     n_weight = 1 / zeros
+        # elif zeros == 0:
+        #     p_weight = 1 / ones
+        #     n_weight = 0
+        # else:
+        #     p_weight = 1 / (2 * ones)
+        #     n_weight = 1 / (2 * zeros)
         p_weight = 1 / (2 * ones)
         n_weight = 1 / (2 * zeros)
         self.weights = np.where(y == 1, p_weight, n_weight)
 
-        assert EQ(np.sum(self.weights), 1), "Weights do not sum to 1"
+        assert EQ(np.sum(self.weights), 1), "Weights do not sum to 1" + " ∑w=" +str(np.sum(self.weights))
 
 
-    def train(self):
-        for t in range(self.T):
+    def train(self, start_idx: int = 0):
+        for t in range(start_idx, self.T):
             self.weights = self.weights / np.sum(self.weights)
             best_classifier = BestClassifier(self.X, self.y, self.weights, batchsize=self.batchsize, delete_unused=True, verbose=self.verbose)
             weak_classifier, _ = best_classifier.chooseClassifier()
             self.weak_classifiers.append(weak_classifier)
             ϵ = weak_classifier.ϵ 
             β = ϵ / (1 - ϵ)
-            alpha = np.log(1 / β)
+            alpha = np.log(1 / β) #if β != 0 else 1000 # 1000 is a large number
             self.alphas.append(alpha)
             predictions = weak_classifier.predict(self.X)
             # α=ln(1/β) -> β = e^(-α) -> β^(1-e) = exp(-α * (1-e)) = exp(α * c), c: 1 if correct, 0 if incorrect
