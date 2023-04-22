@@ -19,3 +19,5 @@ README.md
 
 --------------
 - Refactor code
+- cpu instead of gpu
+- num_workers in dataloader

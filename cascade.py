@@ -16,21 +16,26 @@ class CascadeClassifier:
                  y: np.ndarray, 
                  layers: list= _default_layers, 
                  batchsize: int = 1000,
-                 verbose: bool = False):
+                 verbose: bool = False,
+                 use_stored: bool = True):
         """
         X: training data, a numpy array of shape (n_features, n_samples)
         y: training labels, a numpy array of shape (n_samples,)
         layers: list of number of iterations for each layer
+        batchsize: batchsize for training
+        verbose: print training progress
+        use_stored: if True, continue training from last stored strong classifier
         """
         self.X = X
         self.y = y
         self.layers = layers
-        self.strong_classifiers: list[StrongClassifierChooser] = []
+        self.strong_classifiers: list[StrongClassifier] = []
         self.n_samples = X.shape[1]
         self.n_features = X.shape[0]
         self.n_layers = len(layers)
         self.batchsize = batchsize
         self.verbose = verbose
+        self.use_stored = use_stored
 
     def train(self):
         """
@@ -44,7 +49,7 @@ class CascadeClassifier:
         if not os.path.exists(dirpath):
             os.makedirs("StrongClassifier/")
 
-        if os.path.exists(lastSC):
+        if os.path.exists(lastSC) and self.use_stored:
             with open(lastSC, "r") as f:
                 start = int(f.read()) + 1
             for i in range(start):
@@ -108,6 +113,18 @@ class CascadeClassifier:
                 predictions[predictions] =\
                       predictions[predictions] & strong_classifier.predict(X[:, predictions])
         return np.where(predictions, 1, 0)
+    
+    def confidence(self, X: np.ndarray, f_idx_map: Dict[int, int] = None):
+        """
+        Return confidence of each sample
+        """
+        confidences = np.zeros(X.shape[1])
+        for strong_classifier in self.strong_classifiers:
+            if f_idx_map is not None:
+                confidences += strong_classifier.confidence(X, f_idx_map)
+            else:
+                confidences += strong_classifier.confidence(X)
+        return confidences
     
     def save(self, filename):
         # save without self.X

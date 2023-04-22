@@ -336,8 +336,34 @@ class FeatureExtractor:
         return m_indecies
     
 
-    def extractFeaturesFromImage(self, img: np.ndarray or torch.Tensor):
-        pass
+    def extractFeaturesFromImage(self, img: torch.Tensor,
+                                 cascadeClassifier: CascadeClassifier,):
+        """
+        Used to extract features from image by indecies of features chosen by cascadeClassifier
+
+        if cascadeClassifier is not None, get indecies from all WeakClassifiers in cascadeClassifier
+        """
+        m_indecies = self.getChosenIndeceies(cascadeClassifier)
+
+        if m_indecies.shape[0] == 0:
+            raise ValueError('indecies is empty')
+        
+        if self.verbose:
+            print('Now extracting features from image...')
+        # indecies of selectPercentile features
+        p_indecies, _ = self.selectPercentile()
+
+        f2_p, f3_p, f4_p = self._idx2f_desc(self.f2, self.f3, self.f4, p_indecies)
+        f2_m, f3_m, f4_m = self._idx2f_desc(f2_p, f3_p, f4_p, m_indecies)
+
+        ii = self.getIntegralImage(img).numpy()
+
+        all_features = self.getFeaturesFromDesc(f2_m, f3_m, f4_m, (ii, None))
+        f_locations = dict()
+        for i in range(all_features.shape[0]):
+            f_locations[m_indecies[i]] = i
+
+        return f_locations, all_features
 
     
     def selectPercentile(self, saveMemory=True):
