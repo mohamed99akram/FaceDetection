@@ -2,7 +2,7 @@ from classifier import BestClassifier, WeakClassifier, EQ
 import numpy as np
 import torch
 import pickle as pkl
-from typing import Dict
+from typing import Dict, List
 class StrongClassifier:
     """
     A strong classifier is a linear combination of weak classifiers
@@ -12,7 +12,7 @@ class StrongClassifier:
 
     θ: threshold of the strong classifier
     """
-    def __init__(self, weak_classifiers: list[WeakClassifier], alphas: list[float]):
+    def __init__(self, weak_classifiers: List[WeakClassifier], alphas: List[float]):
         self.weak_classifiers = weak_classifiers
         self.alphas = alphas
         self.θ = np.sum(self.alphas) / 2

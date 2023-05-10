@@ -8,3 +8,4 @@ __pycache__
 test_classifier copy.ipynb
 StrongClassifier/
 temp/
+azure/
