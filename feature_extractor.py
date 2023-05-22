@@ -163,17 +163,19 @@ class FeatureExtractor:
         
     def extractFeatures(self, 
                         pos_path, 
-                        neg_path, ):
+                        neg_path, 
+                        transform=None):
         """
         Reads dataset, extract features and return X matrix and y vector
         Used to load training data
+        transform: transform to apply to images
 
         pos_path: path to positive images
         neg_path: path to negative images
         
         saves X (features) and y (labels) to files
         """
-        dataset = self.readDataset(pos_path, neg_path)
+        dataset = self.readDataset(pos_path, neg_path, transform=transform)
         dataset_ii = self.getIntegralImage(dataset[0]), dataset[1]
         all_features = self.getFeaturesFromDesc(self.f2, self.f3, self.f4, dataset_ii)
         if self.verbose:
@@ -184,9 +186,10 @@ class FeatureExtractor:
         np.save(self.labels_file, dataset[1])
 
 
-    def readDataset(self, pos_path, neg_path):
+    def readDataset(self, pos_path, neg_path, transform=None):
         """
           return np array of (img, label)
+          transform: transform to apply to images
         """
         pos_img_names = os.listdir(pos_path)
         neg_img_names = os.listdir(neg_path)
@@ -201,11 +204,15 @@ class FeatureExtractor:
         imgs, labels = [], []
         for i in range(len(pos_img_names)):
             img = cv2.imread(pos_img_names[i], 0)
+            if transform is not None:
+                img = transform(img)
             img = cv2.resize(img, self.shape)
             imgs.append(img)
             labels.append(1)
         for i in range(len(neg_img_names)):
             img = cv2.imread(neg_img_names[i], 0)
+            if transform is not None:
+                img = transform(img)
             img = cv2.resize(img, self.shape)
             imgs.append(img)
             # labels.append(-1)
@@ -273,12 +280,14 @@ class FeatureExtractor:
     def extractFeaturesByIndecies(self,
                                   pos_path,
                                   neg_path,
-                                  cascadeClassifier: CascadeClassifier,):
+                                  cascadeClassifier: CascadeClassifier,
+                                  transform=None):
         """
         Used to extract features from dataset (example: testset) by indecies of features chosen by cascadeClassifier
         
         if cascadeClassifier is not None, get indecies from all WeakClassifiers in cascadeClassifier
 
+        transform: transform to apply to images
         return 
             indecies: (dict): indecies[f_idx] = indecies of f_idx-th feature in all_features.
                       values of f_idx are chosen by cascadeClassifier
@@ -293,7 +302,7 @@ class FeatureExtractor:
 
         if self.verbose:
             print('Now reading dataset...')
-        dataset = self.readDataset(pos_path, neg_path)
+        dataset = self.readDataset(pos_path, neg_path, transform=transform)
         dataset_ii = self.getIntegralImage(dataset[0]), dataset[1]
         
         if self.verbose:
@@ -337,7 +346,8 @@ class FeatureExtractor:
     
 
     def extractFeaturesFromImage(self, img: torch.Tensor,
-                                 cascadeClassifier: CascadeClassifier,):
+                                 cascadeClassifier: CascadeClassifier,
+                                 transform=None):
         """
         Used to extract features from image by indecies of features chosen by cascadeClassifier
 
@@ -355,7 +365,10 @@ class FeatureExtractor:
 
         f2_p, f3_p, f4_p = self._idx2f_desc(self.f2, self.f3, self.f4, p_indecies)
         f2_m, f3_m, f4_m = self._idx2f_desc(f2_p, f3_p, f4_p, m_indecies)
-
+        
+        if transform is not None:
+            img = transform(img)
+        
         ii = self.getIntegralImage(img).numpy()
 
         all_features = self.getFeaturesFromDesc(f2_m, f3_m, f4_m, (ii, None))
