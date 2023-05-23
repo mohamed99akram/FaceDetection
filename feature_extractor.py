@@ -164,7 +164,8 @@ class FeatureExtractor:
     def extractFeatures(self, 
                         pos_path, 
                         neg_path, 
-                        transform=None):
+                        transform=None,
+                        save_to_file=True):
         """
         Reads dataset, extract features and return X matrix and y vector
         Used to load training data
@@ -173,18 +174,24 @@ class FeatureExtractor:
         pos_path: path to positive images
         neg_path: path to negative images
         
+        if save_to_file is True,
         saves X (features) and y (labels) to files
+
+        return X, y (all features and labels)
         """
         dataset = self.readDataset(pos_path, neg_path, transform=transform)
         dataset_ii = self.getIntegralImage(dataset[0]), dataset[1]
         all_features = self.getFeaturesFromDesc(self.f2, self.f3, self.f4, dataset_ii)
         if self.verbose:
             print('all_features shape:', all_features.shape)
-            print('Now, saving all features to', self.all_features_file)
+            if save_to_file:
+                print('Now, saving all features to', self.all_features_file)
+        
+        if save_to_file:
+            np.savez_compressed(self.all_features_file, all_features)
+            np.save(self.labels_file, dataset[1])
 
-        np.savez_compressed(self.all_features_file, all_features)
-        np.save(self.labels_file, dataset[1])
-
+        return all_features, dataset[1]
 
     def readDataset(self, pos_path, neg_path, transform=None):
         """
@@ -276,7 +283,16 @@ class FeatureExtractor:
         all_features = all_features.numpy()
         return all_features
 
-
+    def extractFeaturesByClassifier(self,
+                                    pos_path,
+                                    neg_path,
+                                    cascadeClassifier: CascadeClassifier,
+                                    transform=None):
+        """
+        Same as extractFeaturesByIndecies to get indecies from cascadeClassifier - just a better name
+        """
+        return self.extractFeaturesByIndecies(pos_path, neg_path, cascadeClassifier, transform)
+    
     def extractFeaturesByIndecies(self,
                                   pos_path,
                                   neg_path,
@@ -286,7 +302,9 @@ class FeatureExtractor:
         Used to extract features from dataset (example: testset) by indecies of features chosen by cascadeClassifier
         
         if cascadeClassifier is not None, get indecies from all WeakClassifiers in cascadeClassifier
-
+        
+        It needs selectPercentile to be run before because selectPercentile selects features with highest F-value, then cascadeClassifier chooses features from them
+        
         transform: transform to apply to images
         return 
             indecies: (dict): indecies[f_idx] = indecies of f_idx-th feature in all_features.
@@ -308,7 +326,8 @@ class FeatureExtractor:
         if self.verbose:
             print('Now extracting features from dataset...')
         # indecies of selectPercentile features
-        p_indecies, _ = self.selectPercentile()
+        # p_indecies, _ = self.selectPercentile()
+        p_indecies = self.loadPercentileIndecies()
 
         f2_p, f3_p, f4_p = self._idx2f_desc(self.f2, self.f3, self.f4, p_indecies)
         f2_m, f3_m, f4_m = self._idx2f_desc(f2_p, f3_p, f4_p, m_indecies)
@@ -361,7 +380,8 @@ class FeatureExtractor:
         if self.verbose:
             print('Now extracting features from image...')
         # indecies of selectPercentile features
-        p_indecies, _ = self.selectPercentile()
+        # p_indecies, _ = self.selectPercentile()
+        p_indecies = self.loadPercentileIndecies()
 
         f2_p, f3_p, f4_p = self._idx2f_desc(self.f2, self.f3, self.f4, p_indecies)
         f2_m, f3_m, f4_m = self._idx2f_desc(f2_p, f3_p, f4_p, m_indecies)
@@ -379,9 +399,12 @@ class FeatureExtractor:
         return f_locations, all_features
 
     
-    def selectPercentile(self, saveMemory=True):
+    def selectPercentile(self, X=None, y=None, saveMemory=True, save_to_file=True):
         """
         Selects features with highest F-value
+        X: features (n_features, n_images)
+        y: labels (n_images)
+        if X and y are None, load them from files
 
         percentile: percentile of features to select
         return indecies of selected features, selected_featues
@@ -389,23 +412,23 @@ class FeatureExtractor:
         if file 'indecies.npy' exists, load indecies from file
         else, calculate indecies and save them to file
         """
+        if X is None or y is None:
+            if os.path.exists(self.indecies_file) and os.path.exists(self.selected_features_file):
+                indecies = np.load(self.indecies_file)
+                X = np.load(self.selected_features_file)['arr_0']
+                return indecies, X
+            
+            if saveMemory:
+                del self.f2
+                del self.f3
+                del self.f4
+                
+            if not os.path.exists(self.all_features_file) or not os.path.exists(self.labels_file):
+                raise ValueError('all_features_file or labels_file does not exist please run extractFeatures first')
+            
 
-        if os.path.exists(self.indecies_file) and os.path.exists(self.selected_features_file):
-            indecies = np.load(self.indecies_file)
-            X = np.load(self.selected_features_file)['arr_0']
-            return indecies, X
-        
-        if saveMemory:
-            del self.f2
-            del self.f3
-            del self.f4
-        X, y = None, None
-        if not os.path.exists(self.all_features_file) or not os.path.exists(self.labels_file):
-            raise ValueError('all_features_file or labels_file does not exist')
-        
-
-        X = np.load(self.all_features_file)['arr_0']
-        y = np.load(self.labels_file)
+            X = np.load(self.all_features_file)['arr_0']
+            y = np.load(self.labels_file)
 
 
         if self.verbose:
@@ -414,8 +437,19 @@ class FeatureExtractor:
         selector = SelectPercentile(f_classif, percentile=self.percentile)
         indecies = selector.fit(X.T, y).get_support(indices=True)
 
-        np.save(self.indecies_file, indecies)
-        np.savez(self.selected_features_file, X[indecies])
+        if save_to_file:
+            np.save(self.indecies_file, indecies)
+            np.savez(self.selected_features_file, X[indecies])
+
         if saveMemory:
             self.f2, self.f3, self.f4 = self.describe_features(self.shape)
         return indecies, X[indecies]
+    
+    def loadPercentileIndecies(self):
+        """
+        load indecies of selected features from file
+        """
+        if os.path.exists(self.indecies_file):
+            return np.load(self.indecies_file)
+        else:
+            raise ValueError('indecies_file does not exist, please run selectPercentile first')
