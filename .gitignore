@@ -4,6 +4,7 @@ __pycache__
 .ipynb_checkpoints/
 *.pkl
 !cascadeClassifier.pkl
+!indecies.npy
 *.last
 test_classifier copy.ipynb
 StrongClassifier/

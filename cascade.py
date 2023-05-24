@@ -74,6 +74,13 @@ class CascadeClassifier:
             with open(lastSC, "w") as f:
                 f.write(str(i))
                 
+            # Keep Positive Samples and Misclassified Negative Samples. rem_pfn: remaining positive and false positive
+            rem_pfp = (self.y == 0 & self.predict(self.X) == 1) | self.y == 1
+            self.X = self.X[:, rem_pfp]
+            self.y = self.y[rem_pfp]
+
+            # self.X = self.X[:, (self.y == 0 & self.predict(self.X) == 1) | self.y == 1]
+            # self.y = self.y[(self.y == 0 & self.predict(self.X) == 1) | self.y == 1]
             # # predict with current strong classifier
             # predictions = strong_classifier.predict(self.X)
             # # remove all samples that are correctly classified
