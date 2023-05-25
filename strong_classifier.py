@@ -100,11 +100,12 @@ class StrongClassifierChooser:
         # else:
         #     p_weight = 1 / (2 * ones)
         #     n_weight = 1 / (2 * zeros)
-        p_weight = 1 / (2 * ones)
-        n_weight = 1 / (2 * zeros)
-        self.weights = np.where(y == 1, p_weight, n_weight)
+        p_weight = 1 / (2 * ones) if ones > 0 else 0
+        n_weight = 1 / (2 * zeros) if zeros > 0 else 0
+        self.weights = np.where(y == 1, p_weight, n_weight) # if no negative samples, then all weights are 1 / (2 * ones)
+        self.weights = self.weights / np.sum(self.weights)
 
-        assert EQ(np.sum(self.weights), 1), "Weights do not sum to 1" + " ∑w=" +str(np.sum(self.weights))
+        # assert EQ(np.sum(self.weights), 1), "Weights do not sum to 1" + " ∑w=" +str(np.sum(self.weights))
 
 
     def train(self, start_idx: int = 0):

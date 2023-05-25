@@ -78,15 +78,19 @@ class CascadeClassifier:
                 
             # Keep Positive Samples and Misclassified Negative Samples. rem_pfn: remaining positive and false positive
             # TODO self.predict? or strong_classifier.predict?
-            chosen_samples = ((self.y[chosen_samples] == 0) & (self.predict(self.X[:, chosen_samples]) == 1)) | (self.y[chosen_samples] == 1)
+            tmp_bool = ((self.y[chosen_samples] == 0) & (self.predict(self.X[:, chosen_samples]) == 1)) | (self.y[chosen_samples] == 1)
+            # chosen_samples = np.where(tmp_bool, True, False)
+            chosen_samples[chosen_samples] = tmp_bool
+            # now size of chosen_samples = 
             if self.verbose:
+                print("Chosen samples:", chosen_samples.shape)
                 print(f"%%%%%%% Layer {i + 1} / {self.n_layers} has remaining y=1: {np.sum(self.y[chosen_samples] == 1)}, y=0: {np.sum(self.y[chosen_samples] == 0)} %%%%%%%")
 
             # if no negative samples left, break
             if np.sum(self.y[chosen_samples] == 0) == 0:
-                print("At layer", i + 1, "no negative samples left, break")
-                break
-            
+                print("At layer", i + 1, "no negative samples left")
+                # break
+
             # rem_pfp = (self.y == 0 & self.predict(self.X) == 1) | self.y == 1
             # self.X = self.X[:, rem_pfp]
             # self.y = self.y[rem_pfp]
