@@ -90,7 +90,7 @@ class StrongClassifierChooser:
 
         ones = y.sum()
         zeros = self.n_samples - ones
-        assert ones > 0 and zeros > 0, "No positive or negative samples"
+        # assert ones > 0 and zeros > 0, "No positive or negative samples"
         # if ones == 0:
         #     p_weight = 0
         #     n_weight = 1 / zeros
@@ -114,9 +114,9 @@ class StrongClassifierChooser:
             best_classifier = BestClassifier(self.X, self.y, self.weights, batchsize=self.batchsize, delete_unused=True, verbose=self.verbose)
             weak_classifier, _ = best_classifier.chooseClassifier()
             self.weak_classifiers.append(weak_classifier)
-            ϵ = weak_classifier.ϵ 
+            ϵ = weak_classifier.ϵ + 1e-10 # avoid division by zero
             β = ϵ / (1 - ϵ)
-            alpha = np.log(1 / β) #if β != 0 else 1000 # 1000 is a large number
+            alpha = np.log(1 / β) # if β != 0 else 1000 # 1000 is a large number
             self.alphas.append(alpha)
             predictions = weak_classifier.predict(self.X)
             # α=ln(1/β) -> β = e^(-α) -> β^(1-e) = exp(-α * (1-e)) = exp(α * c), c: 1 if correct, 0 if incorrect
