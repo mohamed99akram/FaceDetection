@@ -57,6 +57,7 @@ class Architecture:
                 if self.verbose:
                     print(f"Building layer {i}, classifier {n_i}")
                 strong_classifier_chooser.T = n_i
+                # observe that adding strong classifiers repeats job except for the last one, so we can save time by not repeating and starting from the last one
                 strong_classifier = strong_classifier_chooser.train(n_i - 1)
                 # TODO check if use cascade_classifier or strong_classifier
                 confidence = strong_classifier.confidence(self.X_val)

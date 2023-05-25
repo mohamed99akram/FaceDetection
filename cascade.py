@@ -57,11 +57,13 @@ class CascadeClassifier:
                     self.strong_classifiers.append(pkl.load(f))
             print(f"Continue training from layer {start + 1} / {self.n_layers}")
         
+        chosen_samples = np.ones(self.n_samples, dtype=bool)
         for i in range(start, self.n_layers):
             layer = self.layers[i]
             if self.verbose:
                 print(f"$$$$$$$ Training layer {i + 1} / {self.n_layers} $$$$$$$")
-            strong_classifier_chooser = StrongClassifierChooser(self.X, self.y, layer, batchsize=self.batchsize, verbose=self.verbose)
+            # strong_classifier_chooser = StrongClassifierChooser(self.X, self.y, layer, batchsize=self.batchsize, verbose=self.verbose)
+            strong_classifier_chooser = StrongClassifierChooser(self.X[:, chosen_samples], self.y[chosen_samples], layer, batchsize=self.batchsize, verbose=self.verbose)
             strong_classifier = strong_classifier_chooser.train()
             self.strong_classifiers.append(strong_classifier)
 
@@ -75,12 +77,20 @@ class CascadeClassifier:
                 f.write(str(i))
                 
             # Keep Positive Samples and Misclassified Negative Samples. rem_pfn: remaining positive and false positive
-            rem_pfp = (self.y == 0 & self.predict(self.X) == 1) | self.y == 1
-            self.X = self.X[:, rem_pfp]
-            self.y = self.y[rem_pfp]
+            # TODO self.predict? or strong_classifier.predict?
+            chosen_samples = ((self.y[chosen_samples] == 0) & (self.predict(self.X[:, chosen_samples]) == 1)) | (self.y[chosen_samples] == 1)
+            if self.verbose:
+                print(f"%%%%%%% Layer {i + 1} / {self.n_layers} has remaining y=1: {np.sum(self.y[chosen_samples] == 1)}, y=0: {np.sum(self.y[chosen_samples] == 0)} %%%%%%%")
 
-            # self.X = self.X[:, (self.y == 0 & self.predict(self.X) == 1) | self.y == 1]
-            # self.y = self.y[(self.y == 0 & self.predict(self.X) == 1) | self.y == 1]
+            # if no negative samples left, break
+            if np.sum(self.y[chosen_samples] == 0) == 0:
+                print("At layer", i + 1, "no negative samples left, break")
+                break
+            
+            # rem_pfp = (self.y == 0 & self.predict(self.X) == 1) | self.y == 1
+            # self.X = self.X[:, rem_pfp]
+            # self.y = self.y[rem_pfp]
+
             # # predict with current strong classifier
             # predictions = strong_classifier.predict(self.X)
             # # remove all samples that are correctly classified
