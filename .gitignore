@@ -12,5 +12,8 @@ temp/
 azure/
 *.ini
 new_data3/
+new_data5/
+
 new_data3.zip
 new_data4.zip
+new_data5.zip
