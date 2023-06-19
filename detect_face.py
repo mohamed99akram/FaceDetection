@@ -166,7 +166,7 @@ def find_face(img: np.ndarray,
             print("subwindows.shape: ", subwindows.shape)
             print("coordinates.shape: ", coordinates.shape)
         if use_sklearn:
-            t_features = feature_extractor.extractFeatures2(subwindows)
+            t_features = feature_extractor.extractFeatures2(subwindows, create_ii=True)
             t_f_idx_map = None
         else:
             t_f_idx_map, t_features = feature_extractor.extractFeaturesFromImage(subwindows,
@@ -184,7 +184,7 @@ def find_face(img: np.ndarray,
         # ++++++++++ classify ++++++++++
         # Predict
         if use_sklearn:
-            predictions = classifier.predict(t_features.cpu().numpy().T)
+            predictions = classifier.predict(t_features.T)
         else:
             predictions = classifier.predict(t_features, t_f_idx_map)
 
@@ -198,7 +198,7 @@ def find_face(img: np.ndarray,
             tmp_conf = classifier.confidence(t_features, t_f_idx_map)
             arg_max = np.argmax(tmp_conf)
         else:
-            tmp_conf = classifier.decision_function(t_features.cpu().numpy().T)
+            tmp_conf = classifier.decision_function(t_features.T)
             arg_max = np.argmax(tmp_conf)
         if tmp_conf[arg_max] > max_confidence:
           # region_max_conf = np.concatenate((coordinates[arg_max], coordinates[arg_max] + np.array(window_size)), axis=0)

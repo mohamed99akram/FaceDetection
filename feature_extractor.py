@@ -206,10 +206,10 @@ class FeatureExtractor:
         return: features of imgs (n_features, n_images)
         """
         if create_ii:
-            imgs = self.getIntegralImage(imgs)
+            imgs = self.getIntegralImage(imgs).numpy()
 
         if use_percentile:
-            indecies, _ = self.loadPercentileIndecies()
+            indecies = self.loadPercentileIndecies()
             f2, f3, f4 = self._idx2f_desc(self.f2, self.f3, self.f4, indecies)
         else:
             f2, f3, f4 = self.f2, self.f3, self.f4
