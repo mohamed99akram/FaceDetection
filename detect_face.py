@@ -5,6 +5,7 @@ import numpy as np
 import time
 from cascade import CascadeClassifier
 from typing import Tuple
+from sklearn.ensemble import AdaBoostClassifier
 
 def get_subwindows(img: torch.Tensor or np.ndarray, size: Tuple, stride: int, device: torch.device):
     """
@@ -60,7 +61,7 @@ def get_subwindows(img: torch.Tensor or np.ndarray, size: Tuple, stride: int, de
     return subwindows, coordinates
 
 def find_face(img: np.ndarray, 
-              classifier:CascadeClassifier, 
+              classifier:CascadeClassifier or AdaBoostClassifier, 
               feature_extractor:FeatureExtractor,
               window_size:Tuple=(19,19), 
               scale_dist:float=1.25, 
@@ -69,7 +70,8 @@ def find_face(img: np.ndarray,
               device:torch.device=None,
               verbose:bool=False,
               normalize_subwindows=False, 
-              report_time=False):
+              report_time=False,
+              use_sklearn=False):
     """
     img: np.ndarray, shape = (height, width) (should be normalized, resized to same size, and gray)
     window_size: tuple, (wnd_h, wnd_w) window size used for training 
@@ -163,8 +165,11 @@ def find_face(img: np.ndarray,
             print("subwindows.shape: ", subwindows.shape)
             print("subwindows.shape: ", subwindows.shape)
             print("coordinates.shape: ", coordinates.shape)
-        
-        t_f_idx_map, t_features = feature_extractor.extractFeaturesFromImage(subwindows,
+        if use_sklearn:
+            t_features = feature_extractor.extractFeatures2(subwindows)
+            t_f_idx_map = None
+        else:
+            t_f_idx_map, t_features = feature_extractor.extractFeaturesFromImage(subwindows,
                                                 cascadeClassifier=classifier)
         
         
@@ -178,7 +183,10 @@ def find_face(img: np.ndarray,
 
         # ++++++++++ classify ++++++++++
         # Predict
-        predictions = classifier.predict(t_features, t_f_idx_map)
+        if use_sklearn:
+            predictions = classifier.predict(t_features.cpu().numpy().T)
+        else:
+            predictions = classifier.predict(t_features, t_f_idx_map)
 
         if verbose:
             print("predictions.shape: ", predictions.shape)
@@ -186,8 +194,12 @@ def find_face(img: np.ndarray,
 
         # get face coordinates from coordinates, predictions. Put coordinates, size into face_coordinates
         # make 4 coordinates for each face (x1, y1, x2, y2)
-        tmp_conf = classifier.confidence(t_features, t_f_idx_map)
-        arg_max = np.argmax(tmp_conf)
+        if not use_sklearn:
+            tmp_conf = classifier.confidence(t_features, t_f_idx_map)
+            arg_max = np.argmax(tmp_conf)
+        else:
+            tmp_conf = classifier.decision_function(t_features.cpu().numpy().T)
+            arg_max = np.argmax(tmp_conf)
         if tmp_conf[arg_max] > max_confidence:
           # region_max_conf = np.concatenate((coordinates[arg_max], coordinates[arg_max] + np.array(window_size)), axis=0)
           region_max_conf = np.concatenate((coordinates[arg_max], coordinates[arg_max] + np.array(current_size)), axis=0)

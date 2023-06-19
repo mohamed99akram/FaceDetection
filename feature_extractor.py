@@ -193,6 +193,31 @@ class FeatureExtractor:
 
         return all_features, dataset[1]
 
+    def extractFeatures2(self, 
+                         imgs: torch.Tensor,
+                         create_ii=False,
+                         use_percentile=True,):
+        """
+        different from extractFeatures in that it does not read dataset from files, it takes images
+            also, it does not take a classifier to choose features, it uses all features
+        imgs: list of images
+        create_ii: if True, create integral images from imgs
+        use_percentile: if True, use selectPercentile to select features
+        return: features of imgs (n_features, n_images)
+        """
+        if create_ii:
+            imgs = self.getIntegralImage(imgs)
+
+        if use_percentile:
+            indecies, _ = self.loadPercentileIndecies()
+            f2, f3, f4 = self._idx2f_desc(self.f2, self.f3, self.f4, indecies)
+        else:
+            f2, f3, f4 = self.f2, self.f3, self.f4
+
+        all_features = self.getFeaturesFromDesc(f2, f3, f4, (imgs, None))
+
+        return all_features
+
     def readDataset(self, pos_path, neg_path, transform=None):
         """
           return np array of (img, label)
@@ -327,6 +352,7 @@ class FeatureExtractor:
             print('Now extracting features from dataset...')
         # indecies of selectPercentile features
         # p_indecies, _ = self.selectPercentile()
+        # TODO memoize the following
         p_indecies = self.loadPercentileIndecies()
 
         f2_p, f3_p, f4_p = self._idx2f_desc(self.f2, self.f3, self.f4, p_indecies)
@@ -389,7 +415,7 @@ class FeatureExtractor:
         if transform is not None:
             img = transform(img)
         
-        ii = self.getIntegralImage(img).numpy()
+        ii = self.getIntegralImage(img).numpy() # converted later to torch.Tensor
 
         all_features = self.getFeaturesFromDesc(f2_m, f3_m, f4_m, (ii, None))
         f_locations = dict()
