@@ -424,6 +424,39 @@ class FeatureExtractor:
 
         return f_locations, all_features
 
+    def clf_2_f_desc(self,
+                     cascadeClassifier: CascadeClassifier,
+                     percentile=True):
+        """
+        Used to get feature descriptions for cascadeClassifier (f2_m, f3_m, f4_m chosen by cascadeClassifier wrt percentile)
+        also returns indecies of features chosen by cascadeClassifier as a dict
+
+        return: f_locations, f2_m, f3_m, f4_m 
+            f_locations: dictionary that maps classifier chosen indecies to extracted features indecies
+            f2_m, f3_m, f4_m : features descriptions
+        """
+        m_indecies = self.getChosenIndeceies(cascadeClassifier)
+
+        if m_indecies.shape[0] == 0:
+            raise ValueError('indecies is empty')
+        
+        if percentile:
+            p_indecies = self.loadPercentileIndecies()
+            f2_p, f3_p, f4_p = self._idx2f_desc(self.f2, self.f3, self.f4, p_indecies)
+        else:
+            f2_p, f3_p, f4_p = self.f2, self.f3, self.f4
+
+        f2_m, f3_m, f4_m = self._idx2f_desc(f2_p, f3_p, f4_p, m_indecies)
+
+        f_locations = dict()
+        all_features_shape = f2_m.shape[0] + f3_m.shape[0] + f4_m.shape[0]
+
+        for i in range(all_features_shape):
+            f_locations[m_indecies[i]] = i
+
+        return f_locations, f2_m, f3_m, f4_m
+
+
     
     def selectPercentile(self, X=None, y=None, saveMemory=True, save_to_file=True):
         """
