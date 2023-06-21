@@ -36,6 +36,7 @@ class CascadeClassifier:
         self.batchsize = batchsize
         self.verbose = verbose
         self.use_stored = use_stored
+        self.updatedIndecies = False
 
     def train(self):
         """
@@ -147,6 +148,60 @@ class CascadeClassifier:
                 confidences += strong_classifier.confidence(X)
         return confidences
     
+    def updateIndecies(self, f_idx_map: Dict[int, int]):
+        """
+        Update the indecies of features in each weak classifier
+        """
+        if self.updatedIndecies:
+            return
+        for strong_classifier in self.strong_classifiers:
+            strong_classifier.updateIndecies(f_idx_map)
+        self.updatedIndecies = True
+
+    def predict2(self, X: np.ndarray):
+        """
+        Predict given data
+        call it only after updateIndecies
+        input:
+            X: data to predict, a numpy array of shape (n_features, n_samples)
+        output:
+          predictions: predictions
+        """
+        if not self.updatedIndecies:
+            raise Exception("Call updateIndecies first")
+
+
+        predictions = np.ones(X.shape[1], dtype=bool)
+        for strong_classifier in self.strong_classifiers:
+            # if predictions is all false, break
+            if not np.any(predictions):
+                break
+            predictions[predictions] =\
+                  predictions[predictions] & strong_classifier.predict2(X[:, predictions])
+        return np.where(predictions, 1, 0)
+    
+    def confidence2(self, X: np.ndarray):
+        """
+        Return confidence of each sample
+        """
+        confidences = np.zeros(X.shape[1])
+        for strong_classifier in self.strong_classifiers:
+            confidences += strong_classifier.confidence2(X)
+        return confidences
+
+
+    def updateThreshold(self, θ):
+        for strong_classifier in self.strong_classifiers:
+            strong_classifier.θ = θ
+
+    def changePN(self, p=1, n=0):
+        """
+        Change positive and negative labels
+        """
+        for strong_classifier in self.strong_classifiers:
+            strong_classifier.changePN(p, n)
+
+
     def save(self, filename):
         # save without self.X
         tmpX = self.X

@@ -16,6 +16,9 @@ class StrongClassifier:
         self.weak_classifiers = weak_classifiers
         self.alphas = alphas
         self.θ = np.sum(self.alphas) / 2
+        self.updatedIndecies = False
+        self.p = 1
+        self.n = 0
 
     def confidence(self, X: np.ndarray = None, f_idx_map: Dict[int, int] = None):
         """
@@ -57,6 +60,55 @@ class StrongClassifier:
         # return predictions >= np.sum(self.alphas) / 2
         return self.confidence(X, f_idx_map=f_idx_map) >= self.θ
     
+    def updateIndecies(self, f_idx_map: Dict[int, int]):
+        """
+        Update the indecies of features in each weak classifier
+        """
+        if self.updatedIndecies:
+            return
+        for weak_classifier in self.weak_classifiers:
+            weak_classifier.updateIndecies(f_idx_map)
+        self.updatedIndecies = True
+
+    def confidence2(self, X: np.ndarray = None):
+        if not self.updatedIndecies:
+            raise Exception("Call updateIndecies first")
+        
+        confidence = np.zeros(X.shape[1])
+
+        for i, weak_classifier in enumerate(self.weak_classifiers):
+            confidence += self.alphas[i] * weak_classifier.predict2(X)
+
+        return confidence
+    
+    def predict2(self, X: np.ndarray = None):
+        """
+        Predict given data
+        call it only after updateIndecies
+
+        input:
+            X: data to predict, a numpy array of shape (n_features, n_samples)
+
+        output:
+            predictions: predictions
+        """
+        if not self.updatedIndecies:
+            raise Exception("Call updateIndecies first")
+        
+        return self.confidence2(X) >= self.θ
+    
+    def changePN(self, p=1, n=0):
+        """
+        Change the positive and negative labels
+        """
+        self.p = p
+        self.n = n
+        for weak_classifier in self.weak_classifiers:
+            weak_classifier.changePN(p, n)
+            
+
+
+
     def save(self, filepath):
         with open(filepath, "wb") as f:
             pkl.dump(self, f)

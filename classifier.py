@@ -30,6 +30,9 @@ class WeakClassifier():
         self.θ = threshold.cpu().numpy() if type(threshold) == torch.Tensor else threshold
         self.p = polarity.cpu().numpy() if type(polarity) == torch.Tensor else polarity
         self.ϵ = error.cpu().numpy() if type(error) == torch.Tensor else error
+        self.updatedIndecies = False
+        self.P = 1
+        self.N = 0
         
         
         
@@ -59,6 +62,32 @@ class WeakClassifier():
         if f_idx_map is not None:
             return np.where(X[f_idx_map[int(self.f_idx)]] * self.p <= self.θ * self.p, 1, 0)
         return np.where(X[self.f_idx] * self.p <= self.θ * self.p, 1, 0)
+
+    def updateIndecies(self, f_idx_map: Dict[int, int]):
+        """
+        Update the indecies of features in each weak classifier
+        """
+        if self.updatedIndecies:
+            return
+        self.f_idx = f_idx_map[self.f_idx]
+        self.updatedIndecies = True
+
+    def predict2(self, X: np.ndarray):
+        """
+        Predict given data
+        call it only after updateIndecies
+        input:
+            X: data to predict, a numpy array of shape (n_features, n_samples)
+        output:
+          predictions: predictions
+        """
+        if not self.updatedIndecies:
+            raise Exception("Call updateIndecies first")
+        return np.where(X[self.f_idx] * self.p <= self.θ * self.p, self.P, self.N)
+    
+    def changePN(self, p=1, n=0):
+        self.P = p
+        self.N = n
 
     # make a function for easier access as numpy array, example: np.array(wc)
     def __array__(self):
