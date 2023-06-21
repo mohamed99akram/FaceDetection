@@ -69,7 +69,7 @@ class WeakClassifier():
         """
         if self.updatedIndecies:
             return
-        self.f_idx = f_idx_map[self.f_idx]
+        self.f_idx = f_idx_map[int(self.f_idx)]
         self.updatedIndecies = True
 
     def predict2(self, X: np.ndarray):
