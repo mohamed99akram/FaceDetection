@@ -312,17 +312,19 @@ class FeatureExtractor:
                                     pos_path,
                                     neg_path,
                                     cascadeClassifier: CascadeClassifier,
-                                    transform=None):
+                                    transform=None,
+                                    use_percentile=True):
         """
         Same as extractFeaturesByIndecies to get indecies from cascadeClassifier - just a better name
         """
-        return self.extractFeaturesByIndecies(pos_path, neg_path, cascadeClassifier, transform)
+        return self.extractFeaturesByIndecies(pos_path, neg_path, cascadeClassifier, transform, use_percentile)
     
     def extractFeaturesByIndecies(self,
                                   pos_path,
                                   neg_path,
                                   cascadeClassifier: CascadeClassifier,
-                                  transform=None):
+                                  transform=None,
+                                  use_percentile=True):
         """
         Used to extract features from dataset (example: testset) by indecies of features chosen by cascadeClassifier
         
@@ -353,10 +355,17 @@ class FeatureExtractor:
         # indecies of selectPercentile features
         # p_indecies, _ = self.selectPercentile()
         # TODO memoize the following
-        p_indecies = self.loadPercentileIndecies()
+        if use_percentile:
+            p_indecies = self.loadPercentileIndecies()
+            f2_p, f3_p, f4_p = self._idx2f_desc(self.f2, self.f3, self.f4, p_indecies)
+        else:
+            f2_p, f3_p, f4_p = self.f2, self.f3, self.f4
 
-        f2_p, f3_p, f4_p = self._idx2f_desc(self.f2, self.f3, self.f4, p_indecies)
         f2_m, f3_m, f4_m = self._idx2f_desc(f2_p, f3_p, f4_p, m_indecies)
+        # p_indecies = self.loadPercentileIndecies()
+
+        # f2_p, f3_p, f4_p = self._idx2f_desc(self.f2, self.f3, self.f4, p_indecies)
+        # f2_m, f3_m, f4_m = self._idx2f_desc(f2_p, f3_p, f4_p, m_indecies)
 
         all_features = self.getFeaturesFromDesc(f2_m, f3_m, f4_m, dataset_ii)
         f_locations = dict()

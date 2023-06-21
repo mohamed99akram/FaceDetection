@@ -4,6 +4,7 @@ import numpy as np
 from classifier import BestClassifier, WeakClassifier
 from strong_classifier import StrongClassifierChooser, StrongClassifier
 import pickle as pkl
+import joblib
 import os
 from typing import Dict
 def _rep(n, x):
@@ -209,3 +210,11 @@ class CascadeClassifier:
         with open(filename, "wb") as f:
             pkl.dump(self, f)
         self.X = tmpX
+
+
+    def save_joblib(self, filename):
+        # save without self.X
+        tmpX = self.X
+        self.X = None
+        joblib.dump(self, filename)
+        self.X = tmpX    
