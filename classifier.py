@@ -233,7 +233,8 @@ class BestClassifier():
             #     del self.y
 
             #+ sort features, labels, weights by corresponding features (sort each row of X)
-            sorting_indecies = torch.argsort(X, stable=True)
+            # sorting_indecies = torch.argsort(X, stable=True)
+            sorting_indecies = torch.argsort(X)
             idx0 = torch.arange(X.shape[0]).reshape(-1, 1).to(self.device) #% (n_features_sub, 1)
 
             #+ s_w: srorted weights, s_f: sorted features, s_y: sorted labels
