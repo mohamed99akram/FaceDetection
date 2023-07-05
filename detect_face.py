@@ -66,6 +66,7 @@ def find_face(img: np.ndarray,
               window_size:Tuple=(19,19), 
               scale_dist:float=1.25, 
               max_size:int=300, 
+              min_size:int=19,
               stride:int=10, 
               device:torch.device=None,
               verbose:bool=False,
@@ -103,11 +104,23 @@ def find_face(img: np.ndarray,
     
     # img =  (img - img.mean()) / img.std()
     # get subwindows
-    current_size = window_size[0], window_size[1]
+
+    # current_size = window_size[0], window_size[1]
+    # max_confidence = -np.inf
+    # region_max_conf = None
+    # face_coordinates = []
+    # while current_size[0] < max_size and current_size[1] < max_size and current_size[0] < img.shape[0] and current_size[1] < img.shape[1]:
+    #     if verbose:
+    #         print("current_size: ", current_size)
+
+    #     # ++++++++++ get subwindows ++++++++++
+    #     subwindows, coordinates = get_subwindows(img, current_size, stride, device)
+
+    current_size = min(img.shape[0], img.shape[1]), min(img.shape[0], img.shape[1])
     max_confidence = -np.inf
     region_max_conf = None
     face_coordinates = []
-    while current_size[0] < max_size and current_size[1] < max_size and current_size[0] < img.shape[0] and current_size[1] < img.shape[1]:
+    while current_size[0] >= min_size and current_size[1] >= min_size:
         if verbose:
             print("current_size: ", current_size)
 
@@ -217,7 +230,8 @@ def find_face(img: np.ndarray,
             print("face_coordinates.shape: ", np.array(face_coordinates).shape)
             print("face_coordinates: ", np.array(face_coordinates))
 
-        current_size = int(current_size[0] * scale_dist), int(current_size[1] * scale_dist)
+        # current_size = int(current_size[0] * scale_dist), int(current_size[1] * scale_dist)
+        current_size = int(current_size[0] / scale_dist), int(current_size[1] / scale_dist)
 
     if report_time:
         return face_coordinates, region_max_conf, max_confidence, dict(zip(tasks, tasks_times))
@@ -294,7 +308,8 @@ class FaceDetector:
     def find_face(self,
                    img: np.ndarray, 
                    predict=True,
-                   confidence=True):
+                   confidence=True,
+                   min_size:int=19):
         """
         img: np.ndarray, shape = (height, width) (should be normalized, resized to same size, and gray)
         return: face_coordinates: list of tuples, [(x1, y1, x2, y2), ...] (x1, y1) is the top left corner, (x2, y2) is the bottom right corner
@@ -314,14 +329,25 @@ class FaceDetector:
         if self.report_time:
             start = time.time()
         
-        # get subwindows
-        current_size = self.window_size[0], self.window_size[1]
+        # # get subwindows
+        # current_size = self.window_size[0], self.window_size[1]
+        # max_confidence = -np.inf
+        # region_max_conf = None
+        # face_coordinates = []
+
+
+        # while current_size[0] < self.max_size and current_size[1] < self.max_size and current_size[0] < img.shape[0] and current_size[1] < img.shape[1]:
+        #     if self.verbose:
+        #         print("current_size: ", current_size)
+
+        #     # ++++++++++ get subwindows ++++++++++
+        #     subwindows, coordinates = get_subwindows(img, current_size, self.stride, self.device)
+
+        current_size = min(img.shape[0], img.shape[1]), min(img.shape[0], img.shape[1])
         max_confidence = -np.inf
         region_max_conf = None
         face_coordinates = []
-
-
-        while current_size[0] < self.max_size and current_size[1] < self.max_size and current_size[0] < img.shape[0] and current_size[1] < img.shape[1]:
+        while current_size[0] >= min_size and current_size[1] >= min_size:
             if self.verbose:
                 print("current_size: ", current_size)
 
@@ -422,7 +448,8 @@ class FaceDetector:
                 print("face_coordinates.shape: ", np.array(face_coordinates).shape)
                 print("face_coordinates: ", np.array(face_coordinates))
 
-            current_size = int(current_size[0] * self.scale_dist), int(current_size[1] * self.scale_dist)
+            # current_size = int(current_size[0] * self.scale_dist), int(current_size[1] * self.scale_dist)
+            current_size = int(current_size[0] / self.scale_dist), int(current_size[1] / self.scale_dist)
 
 
         if self.report_time:

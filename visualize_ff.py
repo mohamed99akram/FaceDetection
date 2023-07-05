@@ -41,11 +41,11 @@ face_detector = joblib.load('hFeatures6/faceDetector2.joblib')
 face_detector.max_size=600
 all_classifiers = face_detector.classifier.strong_classifiers[0].weak_classifiers
 resized = False
-# for j in range(200, 250): # images
+# for j in range(0, 50): # images
 # for j in [171, 172, 173, 183]:
 for j in [966]:
-    for i in range(1, 200, 10):
-    # for i in [80]: # number of classifiers
+    # for i in range(1, 200, 10):
+    for i in [80]: # number of classifiers
         face_detector.classifier.strong_classifiers[0].weak_classifiers = all_classifiers[:i]
         print(f'Taking up to {i} classifiers out of {len(all_classifiers)}')
         # face_detector.feature_extractor.batch_size = 10000
@@ -63,8 +63,8 @@ for j in [966]:
             gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
         else:
             # img = cv2.resize(img, (img.shape[1]//10, img.shape[0]//10))
-            # img = cv2.resize(img, (250,250))
-            img = cv2.resize(img, (640, 350))
+            img = cv2.resize(img, (250,250))
+            # img = cv2.resize(img, (640, 350))
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         # show gray
         # plt.imshow(gray, cmap='gray')
