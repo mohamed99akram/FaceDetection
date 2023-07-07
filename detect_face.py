@@ -71,7 +71,8 @@ def find_face(img: np.ndarray,
               verbose:bool=False,
               normalize_subwindows=False, 
               report_time=False,
-              use_sklearn=False):
+              use_sklearn=False,
+              sklearn_selector=None):
     """
     img: np.ndarray, shape = (height, width) (should be normalized, resized to same size, and gray)
     window_size: tuple, (wnd_h, wnd_w) window size used for training 
@@ -184,7 +185,8 @@ def find_face(img: np.ndarray,
         # ++++++++++ classify ++++++++++
         # Predict
         if use_sklearn:
-            predictions = classifier.predict(t_features.T)
+            sklearn_t_features = sklearn_selector.transform(t_features.T)
+            predictions = classifier.predict(sklearn_t_features)
         else:
             predictions = classifier.predict(t_features, t_f_idx_map)
 
@@ -198,7 +200,7 @@ def find_face(img: np.ndarray,
             tmp_conf = classifier.confidence(t_features, t_f_idx_map)
             arg_max = np.argmax(tmp_conf)
         else:
-            tmp_conf = classifier.decision_function(t_features.T)
+            tmp_conf = classifier.decision_function(sklearn_t_features)
             arg_max = np.argmax(tmp_conf)
         if tmp_conf[arg_max] > max_confidence:
           # region_max_conf = np.concatenate((coordinates[arg_max], coordinates[arg_max] + np.array(window_size)), axis=0)
