@@ -7,6 +7,11 @@ import pickle as pkl
 import joblib
 import os
 from typing import Dict
+import glob
+from detect_face import FaceDetector
+import cv2
+from copy import deepcopy
+
 def _rep(n, x):
     return [x] * n
 
@@ -39,17 +44,18 @@ class CascadeClassifier:
         self.use_stored = use_stored
         self.updatedIndecies = False
 
-    def train(self):
+    def train(self,
+              dirpath: str = "StrongClassifier/",
+              lastSC: str = "StrongClassifier/lastSC.last",
+              more_neg_path: str = None,):
         """
         Train the cascade classifier
         return: training accuracy
         """
         start = 0
         # to continue training
-        dirpath = "StrongClassifier/"
-        lastSC = "StrongClassifier/lastSC.last"
         if not os.path.exists(dirpath):
-            os.makedirs("StrongClassifier/")
+            os.makedirs(dirpath)
 
         if os.path.exists(lastSC) and self.use_stored:
             with open(lastSC, "r") as f:
@@ -106,6 +112,26 @@ class CascadeClassifier:
         # return accuracy
         predictions = self.predict(self.X)
         return np.sum(predictions == self.y) / self.X.shape[1]
+
+
+    def getMoreNeg(self, more_neg_path: str, start: int = 0, window_size = (24, 24), stride = 50):
+        """
+        Get more negative samples from more_neg_path
+        """
+        if more_neg_path is None:
+            return
+        # get all files in more_neg_path (sorted)
+        files = sorted(glob.glob(more_neg_path + "/*.png"))
+        
+        for i in range(start, len(files)):
+            img = cv2.imread(files[i])
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+
+
+            
+
+
 
 
     def predict(self,

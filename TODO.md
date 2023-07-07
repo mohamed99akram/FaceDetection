@@ -29,7 +29,8 @@
   - [ ] memoize what you can in `feature_extractor.py`
   - [ ] `getChosenIndecies` needs to be optimized?
   - [ ] `_idx2f_desc()` seems useful, (memoize? embedded systems?)
-  - [ ] 
+  - [ ] try to edit cascade.py to train one strong classifier and use parts of it in differnt layers
+      - (if an image is not a face by using 3 weak classifiers, then it is still not a face using 200?)
 
 --------------
 README.md
