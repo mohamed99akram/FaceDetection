@@ -8,7 +8,7 @@ import joblib
 import os
 from typing import Dict
 import glob
-from detect_face import FaceDetector
+
 import cv2
 from copy import deepcopy
 
@@ -115,18 +115,20 @@ class CascadeClassifier:
         return np.sum(predictions == self.y) / self.X.shape[1]
 
 
-    # def getMoreNeg(self, more_neg_path: str, start: int = 0, window_size = (24, 24), stride = 50):
-    #     """
-    #     Get more negative samples from more_neg_path
-    #     """
-    #     if more_neg_path is None:
-    #         return
-    #     # get all files in more_neg_path (sorted)
-    #     files = sorted(glob.glob(more_neg_path + "/*.png"))
+    def getMoreNeg(self, more_neg_path: str, start: int = 0, window_size = (24, 24), stride = 50):
+        """
+        Get more negative samples from more_neg_path
+        """
+        from detect_face import FaceDetector
+        return
+        # if more_neg_path is None:
+        #     return
+        # # get all files in more_neg_path (sorted)
+        # files = sorted(glob.glob(more_neg_path + "/*.png"))
         
-    #     for i in range(start, len(files)):
-    #         img = cv2.imread(files[i])
-    #         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # for i in range(start, len(files)):
+        #     img = cv2.imread(files[i])
+        #     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
             # TODO Use FaceDetector to get predictions for subwindows  
 
