@@ -47,7 +47,8 @@ class CascadeClassifier:
     def train(self,
               dirpath: str = "StrongClassifier/",
               lastSC: str = "StrongClassifier/lastSC.last",
-              more_neg_path: str = None,):
+              more_neg_path: str = None,
+              equal_weights: bool = False):
         """
         Train the cascade classifier
         return: training accuracy
@@ -71,7 +72,7 @@ class CascadeClassifier:
             if self.verbose:
                 print(f"$$$$$$$ Training layer {i + 1} / {self.n_layers} $$$$$$$")
             # strong_classifier_chooser = StrongClassifierChooser(self.X, self.y, layer, batchsize=self.batchsize, verbose=self.verbose)
-            strong_classifier_chooser = StrongClassifierChooser(self.X[:, chosen_samples], self.y[chosen_samples], layer, batchsize=self.batchsize, verbose=self.verbose)
+            strong_classifier_chooser = StrongClassifierChooser(self.X[:, chosen_samples], self.y[chosen_samples], layer, batchsize=self.batchsize, verbose=self.verbose, equal_weights=equal_weights)
             strong_classifier = strong_classifier_chooser.train()
             self.strong_classifiers.append(strong_classifier)
 
@@ -114,24 +115,20 @@ class CascadeClassifier:
         return np.sum(predictions == self.y) / self.X.shape[1]
 
 
-    def getMoreNeg(self, more_neg_path: str, start: int = 0, window_size = (24, 24), stride = 50):
-        """
-        Get more negative samples from more_neg_path
-        """
-        if more_neg_path is None:
-            return
-        # get all files in more_neg_path (sorted)
-        files = sorted(glob.glob(more_neg_path + "/*.png"))
+    # def getMoreNeg(self, more_neg_path: str, start: int = 0, window_size = (24, 24), stride = 50):
+    #     """
+    #     Get more negative samples from more_neg_path
+    #     """
+    #     if more_neg_path is None:
+    #         return
+    #     # get all files in more_neg_path (sorted)
+    #     files = sorted(glob.glob(more_neg_path + "/*.png"))
         
-        for i in range(start, len(files)):
-            img = cv2.imread(files[i])
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #     for i in range(start, len(files)):
+    #         img = cv2.imread(files[i])
+    #         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-
-
-            
-
-
+            # TODO Use FaceDetector to get predictions for subwindows  
 
 
     def predict(self,

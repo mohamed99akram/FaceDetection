@@ -120,7 +120,8 @@ class StrongClassifierChooser:
                  T: int,
                  batchsize: int = 1000,
                  verbose: bool = False,
-                 delete_unused: bool = False):
+                 delete_unused: bool = False,
+                 equal_weights:bool=False):
         """
         X: training data, a numpy array of shape (n_features, n_samples)
         y: training labels, a numpy array of shape (n_samples,)
@@ -152,8 +153,12 @@ class StrongClassifierChooser:
         # else:
         #     p_weight = 1 / (2 * ones)
         #     n_weight = 1 / (2 * zeros)
-        p_weight = 1 / (2 * ones) if ones > 0 else 0
-        n_weight = 1 / (2 * zeros) if zeros > 0 else 0
+        if equal_weights:
+            p_weight = 1 / self.n_samples
+            n_weight = 1 / self.n_samples
+        else:
+            p_weight = 1 / (2 * ones) if ones > 0 else 0
+            n_weight = 1 / (2 * zeros) if zeros > 0 else 0
         self.weights = np.where(y == 1, p_weight, n_weight) # if no negative samples, then all weights are 1 / (2 * ones)
         self.weights = self.weights / np.sum(self.weights)
 
