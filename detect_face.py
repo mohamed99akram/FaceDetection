@@ -339,7 +339,7 @@ class BaseFaceDetector:
         max_confidence, region_max_conf, face_coordinates = -np.inf, None, []
 
         while current_size[0] >= self.min_size and current_size[1] >= self.min_size:
-            if self.verbose: print("current_size: ", current_size)
+            # if self.verbose: print("current_size: ", current_size)
 
             # ++++++++++ get subwindows ++++++++++
             subwindows, coordinates = self.get_sw(img, current_size)
@@ -498,8 +498,11 @@ class FaceDetectorFeatures(BaseFaceDetector):
 
     def extract_features(self, subwindows):
         # TODO use parent's function if not edited
-        t_f_idx_map, t_features = self.feature_extractor.extractFeaturesFromImage(subwindows,
-                                            cascadeClassifier=self.classifier)
+        # t_f_idx_map, t_features = self.feature_extractor.extractFeaturesFromImage(subwindows,
+        #                                     cascadeClassifier=self.classifier,
+        #                                     use_percentile=False)
+        t_features = self.feature_extractor.extractFeatures2(subwindows,create_ii=True, use_percentile=False)
+        t_f_idx_map = None
         return t_f_idx_map, t_features
     
     def predict(self, t_features, t_f_idx_map):
@@ -532,17 +535,34 @@ class FaceDetectorFeatures(BaseFaceDetector):
             t_f_idx_map, t_features = self.extract_features(subwindows) # t_features: (n_features, n_subwindows)
             predictions = self.predict(t_features, t_f_idx_map)
             total_predictions = np.sum(predictions == 1)
+            cur_weights = np.ones((total_predictions, 1))
             if by_confidence:
                 confidences = self.confidence(t_features, t_f_idx_map)
-                weights = np.concatenate((weights, confidences[predictions == 1].reshape(-1, 1)), axis=0)
+                cur_weights = confidences[predictions == 1].reshape(-1, 1)
+                # weights = np.concatenate((weights, cur_weights), axis=0)
             else:
-                weights = np.concatenate((weights, np.ones((total_predictions, 1))), axis=0)
+                cur_weights = np.ones((total_predictions, 1))
+                # weights = np.concatenate((weights, cur_weights), axis=0)
             
             if by_size: # weights are size of subwindows
                 # update weights coming from by_confidence
-                weights[-total_predictions:] *= current_size[0]
-                
+                cur_weights = cur_weights * current_size[0]
+                # weights[-total_predictions:] *= current_size[0]
+            
+            # choose from t_features n_faces
+            if t_features.shape[1] > n_faces:
+                indices = np.random.choice(t_features.shape[1], n_faces, replace=False, p=cur_weights/np.sum(cur_weights))
+                # t_features = t_features[:, np.random.choice(t_features.shape[1], n_faces, replace=False, p=cur_weights/np.sum(cur_weights))]
+            else:
+                indices = np.arange(t_features.shape[1])
+
+            t_features = t_features[:, indices]
+            predictions = predictions[indices]
+            coordinates = coordinates[indices]
+            weights = np.concatenate((weights, cur_weights[indices]), axis=0)
+            # TODO is this correct?
             chosen_features = np.concatenate((chosen_features, t_features[:, predictions == 1]), axis=1)
+            
 
             current_size = int(current_size[0] / self.scale_dist), int(current_size[1] / self.scale_dist)
 

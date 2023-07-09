@@ -168,7 +168,7 @@ class StrongClassifierChooser:
 
 
     def train(self, start_idx: int = 0, layer_num=0):
-        for t in tqdm(range(start_idx, self.T), desc=f"Training strong classifier {str(layer_num).zfill(3)}", colour="green", disable=not self.verbose):
+        for t in tqdm(range(start_idx, self.T), desc=f"Training strong classifier {str(layer_num).zfill(3)}", colour="green"):
             self.weights = self.weights / np.sum(self.weights)
             best_classifier = BestClassifier(self.X, self.y, self.weights, batchsize=self.batchsize, delete_unused=True, verbose=self.verbose)
             weak_classifier, _ = best_classifier.chooseClassifier()
@@ -181,8 +181,8 @@ class StrongClassifierChooser:
             # α=ln(1/β) -> β = e^(-α) -> β^(1-e) = exp(-α * (1-e)) = exp(α * c), c: 1 if correct, 0 if incorrect
             self.weights = self.weights * np.exp(-alpha * (self.y == predictions))
             self.weights = self.weights / np.sum(self.weights)
-            if self.verbose:
-                print(f"Finished training weak classifier {t + 1} / {self.T}")
+            # if self.verbose:
+            #     print(f"Finished training weak classifier {t + 1} / {self.T}")
         
 
         if self.delete_unused:
