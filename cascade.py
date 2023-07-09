@@ -8,7 +8,7 @@ import joblib
 import os
 from typing import Dict
 import glob
-
+from tqdm import tqdm
 import cv2
 from copy import deepcopy
 
@@ -48,9 +48,17 @@ class CascadeClassifier:
               dirpath: str = "StrongClassifier/",
               lastSC: str = "StrongClassifier/lastSC.last",
               more_neg_path: str = None,
-              equal_weights: bool = False):
+              equal_weights: bool = False,
+              print_accuracy: bool = False,
+              *args, **kwargs):
         """
         Train the cascade classifier
+        input:
+            dirpath: directory to save strong classifiers
+            lastSC: file to save last strong classifier number
+            more_neg_path: path to directory of negative samples
+            equal_weights: if True, use equal weights for positive and negative samples
+            kwargs: arguments for getMoreNeg
         return: training accuracy
         """
         start = 0
@@ -66,38 +74,58 @@ class CascadeClassifier:
                     self.strong_classifiers.append(pkl.load(f))
             print(f"Continue training from layer {start + 1} / {self.n_layers}")
         
-        chosen_samples = np.ones(self.n_samples, dtype=bool)
+        # chosen_samples = np.ones(self.n_samples, dtype=bool)
         for i in range(start, self.n_layers):
             layer = self.layers[i]
-            if self.verbose:
-                print(f"$$$$$$$ Training layer {i + 1} / {self.n_layers} $$$$$$$")
+            # if self.verbose:
+            #     print(f"$$$$$$$ Training layer {i + 1} / {self.n_layers} $$$$$$$")
             # strong_classifier_chooser = StrongClassifierChooser(self.X, self.y, layer, batchsize=self.batchsize, verbose=self.verbose)
-            strong_classifier_chooser = StrongClassifierChooser(self.X[:, chosen_samples], self.y[chosen_samples], layer, batchsize=self.batchsize, verbose=self.verbose, equal_weights=equal_weights)
-            strong_classifier = strong_classifier_chooser.train()
+            # strong_classifier_chooser = StrongClassifierChooser(self.X[:, chosen_samples], self.y[chosen_samples], layer, batchsize=self.batchsize, verbose=self.verbose, equal_weights=equal_weights)
+            strong_classifier_chooser = StrongClassifierChooser(self.X, self.y, layer, batchsize=self.batchsize, verbose=self.verbose, equal_weights=equal_weights)
+            strong_classifier = strong_classifier_chooser.train(layer_num = i + 1)
             self.strong_classifiers.append(strong_classifier)
 
-            if self.verbose:
-                print(f"$$$$$$$$$ Finished training layer {i + 1} / {self.n_layers} $$$$")
+            # if self.verbose:
+            #     print(f"$$$$$$$$$ Finished training layer {i + 1} / {self.n_layers} $$$$")
             
             strong_classifier.save(dirpath+f"strong_classifier_{i}.pkl")
             
             # write strong classifier number in lastSC.txt
             with open(lastSC, "w") as f:
                 f.write(str(i))
+
+            if print_accuracy:
+                predictions = self.predict(self.X)
+                print('For layer', i + 1, 'accuracy is', np.sum(predictions == self.y) / self.X.shape[1])
                 
             # Keep Positive Samples and Misclassified Negative Samples. rem_pfn: remaining positive and false positive
             # TODO self.predict? or strong_classifier.predict?
-            tmp_bool = ((self.y[chosen_samples] == 0) & (self.predict(self.X[:, chosen_samples]) == 1)) | (self.y[chosen_samples] == 1)
+            # tmp_bool = ((self.y[chosen_samples] == 0) & (self.predict(self.X[:, chosen_samples]) == 1)) | (self.y[chosen_samples] == 1)
+            remain_bool = ((self.y == 0) & (self.predict(self.X) == 1)) | (self.y == 1)
+            # get features of new negative samples
+            if more_neg_path is not None and i < self.n_layers - 1:
+                # filter X, y
+                self.X = self.X[:, remain_bool]
+                self.y = self.y[remain_bool]
+                # get more negative samples
+                chosen_features = self.getMoreNeg(more_neg_path, *args, **kwargs)
+                # add new negative samples to X
+                self.X = np.concatenate((self.X, chosen_features), axis=1)
+                # add new negative samples to y
+                self.y = np.concatenate((self.y, np.zeros(chosen_features.shape[1], dtype=int)))
+                # update chosen_samples
+                # tmp_bool = np.concatenate((tmp_bool, np.zeros(chosen_features.shape[1], dtype=bool)))
             # chosen_samples = np.where(tmp_bool, True, False)
-            chosen_samples[chosen_samples] = tmp_bool
+            # chosen_samples[chosen_samples] = tmp_bool
             # now size of chosen_samples = 
             if self.verbose:
-                print("Chosen samples:", chosen_samples.shape)
-                print(f"%%%%%%% Layer {i + 1} / {self.n_layers} has remaining y=1: {np.sum(self.y[chosen_samples] == 1)}, y=0: {np.sum(self.y[chosen_samples] == 0)} %%%%%%%")
+                print(f"%%%%%%% Layer {i + 1} / {self.n_layers} has remaining y=1: {np.sum(self.y == 1)}, y=0: {np.sum(self.y == 0)} %%%%%%%")
+                # print("Chosen samples:", chosen_samples.shape)
+                # print(f"%%%%%%% Layer {i + 1} / {self.n_layers} has remaining y=1: {np.sum(self.y[chosen_samples] == 1)}, y=0: {np.sum(self.y[chosen_samples] == 0)} %%%%%%%")
 
             # if no negative samples left, break
-            if np.sum(self.y[chosen_samples] == 0) == 0:
-                print("At layer", i + 1, "no negative samples left")
+            # if np.sum(self.y[chosen_samples] == 0) == 0:
+            #     print("At layer", i + 1, "no negative samples left")
                 # break
 
             # rem_pfp = (self.y == 0 & self.predict(self.X) == 1) | self.y == 1
@@ -110,27 +138,55 @@ class CascadeClassifier:
             # self.X = self.X[:, predictions != self.y]
             # self.y = self.y[predictions != self.y]
             
-        # return accuracy
+        # TODO delete the following
+        # return accuracy of training
         predictions = self.predict(self.X)
         return np.sum(predictions == self.y) / self.X.shape[1]
 
 
-    def getMoreNeg(self, more_neg_path: str, start: int = 0, window_size = (24, 24), stride = 50):
+    def getMoreNeg(self, 
+                   more_neg_path: str, 
+                   n_per_img: int = 6,
+                   req_cnt: int = 6000,
+                   by_confidence: bool = False,
+                   by_size: bool = False,
+                   *args, **kwargs):
         """
         Get more negative samples from more_neg_path
+        negative samples are from non-faces directory that are classified as faces (false positives)
+        input:
+            more_neg_path: path to directory of negative samples
+            n_per_img: number of negative samples to get from each image   
+            req_cnt: required number of negative samples
+            by_confidence: if True, get negative samples by confidence
+            by_size: if True, get negative samples by size
+            kwargs: arguments for FaceDetectorFeatures
+        output:
+            chosen_features: chosen negative samples
         """
-        from detect_face import FaceDetector
-        return
-        # if more_neg_path is None:
-        #     return
-        # # get all files in more_neg_path (sorted)
-        # files = sorted(glob.glob(more_neg_path + "/*.png"))
-        
-        # for i in range(start, len(files)):
-        #     img = cv2.imread(files[i])
-        #     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        from detect_face import FaceDetectorFeatures
+        face_detector = FaceDetectorFeatures(*args, **kwargs)
+        # shuffle files
+        files = glob.glob(more_neg_path + "/*.png")
+        np.random.shuffle(files)
+        cnt = 0
+        chosen_features = np.zeros((self.n_features, 0))
+        req_cnt_per_img = n_per_img
+        for i in range(len(files)):
+            img = cv2.imread(files[i])
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            
+            features = face_detector.find_face_features(img, n_faces=req_cnt_per_img, by_confidence=by_confidence, by_size=by_size) 
 
-            # TODO Use FaceDetector to get predictions for subwindows  
+            cnt += features.shape[1]
+            chosen_features = np.concatenate((chosen_features, features), axis=1)
+            if features.shape[1] < req_cnt_per_img: # keep rest for next image
+                req_cnt_per_img += req_cnt_per_img - features.shape[1]
+            else:
+                req_cnt_per_img = n_per_img
+            if cnt >= req_cnt:
+                break
+        return chosen_features # (n_features, min(cnt, req_cnt))
 
 
     def predict(self,
@@ -223,6 +279,8 @@ class CascadeClassifier:
     def changePN(self, p=1, n=0):
         """
         Change positive and negative labels
+        works only with predict2, confidence2
+        TODO make it work with predict
         """
         for strong_classifier in self.strong_classifiers:
             strong_classifier.changePN(p, n)

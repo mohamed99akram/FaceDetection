@@ -3,6 +3,8 @@ import numpy as np
 import torch
 import pickle as pkl
 from typing import Dict, List
+from tqdm import tqdm
+
 class StrongClassifier:
     """
     A strong classifier is a linear combination of weak classifiers
@@ -165,8 +167,8 @@ class StrongClassifierChooser:
         # assert EQ(np.sum(self.weights), 1), "Weights do not sum to 1" + " ∑w=" +str(np.sum(self.weights))
 
 
-    def train(self, start_idx: int = 0):
-        for t in range(start_idx, self.T):
+    def train(self, start_idx: int = 0, layer_num=0):
+        for t in tqdm(range(start_idx, self.T), desc=f"Training strong classifier {str(layer_num).zfill(3)}", colour="green", disable=not self.verbose):
             self.weights = self.weights / np.sum(self.weights)
             best_classifier = BestClassifier(self.X, self.y, self.weights, batchsize=self.batchsize, delete_unused=True, verbose=self.verbose)
             weak_classifier, _ = best_classifier.chooseClassifier()
