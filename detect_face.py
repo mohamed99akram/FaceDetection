@@ -6,6 +6,8 @@ import time
 from cascade import CascadeClassifier
 from typing import Tuple
 from sklearn.ensemble import AdaBoostClassifier
+import matplotlib.pyplot as plt
+import cv2
 
 def get_subwindows(img: torch.Tensor or np.ndarray, size: Tuple, stride: int, device: torch.device):
     """
@@ -498,11 +500,11 @@ class FaceDetectorFeatures(BaseFaceDetector):
 
     def extract_features(self, subwindows):
         # TODO use parent's function if not edited
-        # t_f_idx_map, t_features = self.feature_extractor.extractFeaturesFromImage(subwindows,
-        #                                     cascadeClassifier=self.classifier,
-        #                                     use_percentile=False)
-        t_features = self.feature_extractor.extractFeatures2(subwindows,create_ii=True, use_percentile=False)
-        t_f_idx_map = None
+        t_f_idx_map, t_features = self.feature_extractor.extractFeaturesFromImage(subwindows,
+                                            cascadeClassifier=self.classifier,
+                                            use_percentile=False)
+        # t_features = self.feature_extractor.extractFeatures2(subwindows,create_ii=True, use_percentile=False)
+        # t_f_idx_map = None
         return t_f_idx_map, t_features
     
     def predict(self, t_features, t_f_idx_map):
@@ -524,7 +526,7 @@ class FaceDetectorFeatures(BaseFaceDetector):
         current_size = min(current_size[0], self.max_size), min(current_size[1], self.max_size)
         face_coordinates = np.empty((0, 4), dtype=np.int32)
         n_features = self.feature_extractor.f2.shape[0] + self.feature_extractor.f3.shape[0] + self.feature_extractor.f4.shape[0]
-        chosen_features = np.empty((n_features, 0), dtype=np.int32)
+        # chosen_features = np.empty((n_features, 0), dtype=np.int32)
         weights = np.empty((0, 1), dtype=np.int32)
         while current_size[0] >= self.min_size and current_size[1] >= self.min_size:
 
@@ -536,6 +538,8 @@ class FaceDetectorFeatures(BaseFaceDetector):
             predictions = self.predict(t_features, t_f_idx_map)
             total_predictions = np.sum(predictions == 1)
             cur_weights = np.ones((total_predictions, 1))
+            tmp_tuple = np.concatenate((coordinates[predictions == 1], coordinates[predictions == 1] + torch.tensor(current_size)), axis=1)
+            face_coordinates = np.concatenate((face_coordinates, tmp_tuple), axis=0)
             if by_confidence:
                 confidences = self.confidence(t_features, t_f_idx_map)
                 cur_weights = confidences[predictions == 1].reshape(-1, 1)
@@ -548,29 +552,57 @@ class FaceDetectorFeatures(BaseFaceDetector):
                 # update weights coming from by_confidence
                 cur_weights = cur_weights * current_size[0]
                 # weights[-total_predictions:] *= current_size[0]
-            t_features = t_features[:, predictions == 1]
-            # choose from t_features n_faces
-            if t_features.shape[1] > n_faces:
-                indices = np.random.choice(t_features.shape[1], n_faces, replace=False, p=cur_weights.flatten()/np.sum(cur_weights))
-                # t_features = t_features[:, np.random.choice(t_features.shape[1], n_faces, replace=False, p=cur_weights/np.sum(cur_weights))]
-            else:
-                indices = np.arange(t_features.shape[1])
 
-            t_features = t_features[:, indices]
-            predictions = predictions[indices]
-            coordinates = coordinates[indices]
-            weights = np.concatenate((weights, cur_weights[indices]), axis=0)
+            weights = np.concatenate((weights, cur_weights), axis=0)
+            
+            # t_features = t_features[:, predictions == 1]
+            # choose from t_features n_faces
+            # if t_features.shape[1] > n_faces:
+            #     indices = np.random.choice(t_features.shape[1], n_faces, replace=False, p=cur_weights.flatten()/np.sum(cur_weights))
+                # t_features = t_features[:, np.random.choice(t_features.shape[1], n_faces, replace=False, p=cur_weights/np.sum(cur_weights))]
+            # else:
+            #     indices = np.arange(t_features.shape[1])
+
+            # t_features = t_features[:, indices]
+            # predictions = predictions[indices]
+            # coordinates = coordinates[indices]
+            # weights = np.concatenate((weights, cur_weights[indices]), axis=0)
             # TODO is this correct?
-            chosen_features = np.concatenate((chosen_features, t_features), axis=1)
+            # chosen_features = np.concatenate((chosen_features, t_features), axis=1)
             
 
             current_size = int(current_size[0] / self.scale_dist), int(current_size[1] / self.scale_dist)
 
         # randomly select n_faces subwindows from chosen_features
-        if chosen_features.shape[1] > n_faces:
-            chosen_features = chosen_features[:, np.random.choice(chosen_features.shape[1], n_faces, replace=False, p=weights.flatten()/np.sum(weights))]
-        return chosen_features # (n_features, min(n_faces, chosen_features.shape[1]))
+        # if chosen_features.shape[1] > n_faces:
+        #     chosen_features = chosen_features[:, np.random.choice(chosen_features.shape[1], n_faces, replace=False, p=weights.flatten()/np.sum(weights))]
+        # return chosen_features # (n_features, min(n_faces, chosen_features.shape[1]))
 
+        # randomly select n_faces subwindows from face_coordinates
+        if face_coordinates.shape[0] > n_faces:
+            indices = np.random.choice(face_coordinates.shape[0], n_faces, replace=False, p=weights.flatten()/np.sum(weights))
+            face_coordinates = face_coordinates[indices]
+        
+        # extract features from face_coordinates
+        subwindows = self.get_subwindows_from_coordinates(img, face_coordinates)
+        # subwindows = self.resize_sw(subwindows) # needed?
+        if self.normalize_subwindows:
+            subwindows = self.normalize_sw(subwindows)
+        t_f_idx_map, t_features = self.extract_features2(subwindows) # t_features: (n_features, n_subwindows)
+        return t_features # (n_features, min(n_faces, chosen_features.shape[1]))
+
+    def get_subwindows_from_coordinates(self, img, coordinates):
+        subwindows = np.empty((0, self.window_size[0], self.window_size[1]), dtype=np.uint8)
+        for coordinate in coordinates:
+            tmp_img = img[coordinate[1]:coordinate[3], coordinate[0]:coordinate[2]]
+            tmp_img = cv2.resize(tmp_img, self.window_size)
+            subwindows = np.concatenate((subwindows, tmp_img.reshape(1, self.window_size[0], self.window_size[1])), axis=0)
+        return torch.tensor(subwindows, dtype=torch.uint8, device=self.device)
+    
+    def extract_features2(self, subwindows):
+        t_features = self.feature_extractor.extractFeatures2(subwindows,create_ii=True, use_percentile=False)
+        t_f_idx_map = None     
+        return t_f_idx_map, t_features   
 
 class FaceDetector:
     def __init__(self,
