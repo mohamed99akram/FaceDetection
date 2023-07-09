@@ -81,7 +81,7 @@ class CascadeClassifier:
             #     print(f"$$$$$$$ Training layer {i + 1} / {self.n_layers} $$$$$$$")
             # strong_classifier_chooser = StrongClassifierChooser(self.X, self.y, layer, batchsize=self.batchsize, verbose=self.verbose)
             # strong_classifier_chooser = StrongClassifierChooser(self.X[:, chosen_samples], self.y[chosen_samples], layer, batchsize=self.batchsize, verbose=self.verbose, equal_weights=equal_weights)
-            strong_classifier_chooser = StrongClassifierChooser(self.X, self.y, layer, batchsize=self.batchsize, verbose=self.verbose, equal_weights=equal_weights)
+            strong_classifier_chooser = StrongClassifierChooser(self.X, self.y, layer, batchsize=self.batchsize, verbose=False, equal_weights=equal_weights)
             strong_classifier = strong_classifier_chooser.train(layer_num = i + 1)
             self.strong_classifiers.append(strong_classifier)
 
@@ -104,15 +104,33 @@ class CascadeClassifier:
             remain_bool = ((self.y == 0) & (self.predict(self.X) == 1)) | (self.y == 1)
             # get features of new negative samples
             if more_neg_path is not None and i < self.n_layers - 1:
+                ones_cnt = np.sum(self.y == 1)
+                zeros_cnt = np.sum(self.y == 0)
                 # filter X, y
                 self.X = self.X[:, remain_bool]
                 self.y = self.y[remain_bool]
+        
+                ones_cnt2 = np.sum(self.y == 1)
+                zeros_cnt2 = np.sum(self.y == 0)
+
+                req_cnt = kwargs.get("req_cnt", 6000) 
+                req_cnt = req_cnt - zeros_cnt2 # make all negatives are equal to req_cnt
+                kwargs["req_cnt"] = req_cnt
+                
                 # get more negative samples
-                chosen_features = self.getMoreNeg(more_neg_path, *args, **kwargs)
+                chosen_features, cnt_ret = self.getMoreNeg(more_neg_path, *args, **kwargs)
                 # add new negative samples to X
                 self.X = np.concatenate((self.X, chosen_features), axis=1)
                 # add new negative samples to y
                 self.y = np.concatenate((self.y, np.zeros(chosen_features.shape[1], dtype=int)))
+
+                if self.verbose:
+                    ones3 = np.sum(self.y == 1)
+                    zeros3 = np.sum(self.y == 0)
+                    print(f"%%%%%%% Layer {i + 1} / {self.n_layers} has remaining y=1: {ones3}, y=0: {zeros3} %%%%%%%")
+                    print("Added", cnt_ret, "negative samples", end=" ")
+                    print("Before:", ones_cnt, zeros_cnt, end=" ")
+                    print("After:", ones3, zeros3)
                 # update chosen_samples
                 # tmp_bool = np.concatenate((tmp_bool, np.zeros(chosen_features.shape[1], dtype=bool)))
             # chosen_samples = np.where(tmp_bool, True, False)
@@ -187,7 +205,7 @@ class CascadeClassifier:
                 req_cnt_per_img = n_per_img
             if cnt >= req_cnt:
                 break
-        return chosen_features # (n_features, min(cnt, req_cnt))
+        return chosen_features, cnt # (n_features, min(cnt, req_cnt))
 
 
     def predict(self,
