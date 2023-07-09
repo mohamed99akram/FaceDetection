@@ -548,10 +548,10 @@ class FaceDetectorFeatures(BaseFaceDetector):
                 # update weights coming from by_confidence
                 cur_weights = cur_weights * current_size[0]
                 # weights[-total_predictions:] *= current_size[0]
-            
+            t_features = t_features[:, predictions == 1]
             # choose from t_features n_faces
             if t_features.shape[1] > n_faces:
-                indices = np.random.choice(t_features.shape[1], n_faces, replace=False, p=cur_weights/np.sum(cur_weights))
+                indices = np.random.choice(t_features.shape[1], n_faces, replace=False, p=cur_weights.flatten()/np.sum(cur_weights))
                 # t_features = t_features[:, np.random.choice(t_features.shape[1], n_faces, replace=False, p=cur_weights/np.sum(cur_weights))]
             else:
                 indices = np.arange(t_features.shape[1])
@@ -561,14 +561,14 @@ class FaceDetectorFeatures(BaseFaceDetector):
             coordinates = coordinates[indices]
             weights = np.concatenate((weights, cur_weights[indices]), axis=0)
             # TODO is this correct?
-            chosen_features = np.concatenate((chosen_features, t_features[:, predictions == 1]), axis=1)
+            chosen_features = np.concatenate((chosen_features, t_features), axis=1)
             
 
             current_size = int(current_size[0] / self.scale_dist), int(current_size[1] / self.scale_dist)
 
         # randomly select n_faces subwindows from chosen_features
         if chosen_features.shape[1] > n_faces:
-            chosen_features = chosen_features[:, np.random.choice(chosen_features.shape[1], n_faces, replace=False, p=weights/np.sum(weights))]
+            chosen_features = chosen_features[:, np.random.choice(chosen_features.shape[1], n_faces, replace=False, p=weights.flatten()/np.sum(weights))]
         return chosen_features # (n_features, min(n_faces, chosen_features.shape[1]))
 
 

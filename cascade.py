@@ -147,6 +147,7 @@ class CascadeClassifier:
     def getMoreNeg(self, 
                    more_neg_path: str, 
                    n_per_img: int = 6,
+                   resize_factor: float = 1,
                    req_cnt: int = 6000,
                    by_confidence: bool = False,
                    by_size: bool = False,
@@ -175,7 +176,7 @@ class CascadeClassifier:
         for i in range(len(files)):
             img = cv2.imread(files[i])
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            
+            img = cv2.resize(img, (int(img.shape[1] * resize_factor), int(img.shape[0] * resize_factor)))
             features = face_detector.find_face_features(img, n_faces=req_cnt_per_img, by_confidence=by_confidence, by_size=by_size) 
 
             cnt += features.shape[1]
