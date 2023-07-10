@@ -338,7 +338,7 @@ class BaseFaceDetector:
         # go from larger to smaller sizes
         current_size = min(img.shape[0], img.shape[1]), min(img.shape[0], img.shape[1])
         current_size = min(current_size[0], self.max_size), min(current_size[1], self.max_size)
-        max_confidence, region_max_conf, face_coordinates = -np.inf, None, []
+        max_confidence, region_max_conf, face_coordinates = -np.inf, None, np.empty((0, 4), dtype=np.int32)
 
         while current_size[0] >= self.min_size and current_size[1] >= self.min_size:
             # if self.verbose: print("current_size: ", current_size)
