@@ -191,7 +191,7 @@ class CascadeClassifier:
         cnt = 0
         # chosen_features = np.zeros((self.n_features, 0))
         req_cnt_per_img = n_per_img
-        for i in range(len(files)):
+        for i in tqdm(range(len(files)), desc='Images', colour='yellow'):
             img = cv2.imread(files[i])
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             img = cv2.resize(img, (int(img.shape[1] * resize_factor), int(img.shape[0] * resize_factor)))
