@@ -118,11 +118,11 @@ class CascadeClassifier:
                 kwargs["req_cnt"] = req_cnt
                 
                 # get more negative samples
-                chosen_features, cnt_ret = self.getMoreNeg(more_neg_path, *args, **kwargs)
+                cnt_ret = self.getMoreNeg(more_neg_path, *args, **kwargs)
                 # add new negative samples to X
-                self.X = np.concatenate((self.X, chosen_features), axis=1)
+                # self.X = np.concatenate((self.X, chosen_features), axis=1)
                 # add new negative samples to y
-                self.y = np.concatenate((self.y, np.zeros(chosen_features.shape[1], dtype=int)))
+                # self.y = np.concatenate((self.y, np.zeros(chosen_features.shape[1], dtype=int)))
 
                 if self.verbose:
                     ones3 = np.sum(self.y == 1)
@@ -136,8 +136,8 @@ class CascadeClassifier:
             # chosen_samples = np.where(tmp_bool, True, False)
             # chosen_samples[chosen_samples] = tmp_bool
             # now size of chosen_samples = 
-            if self.verbose:
-                print(f"%%%%%%% Layer {i + 1} / {self.n_layers} has remaining y=1: {np.sum(self.y == 1)}, y=0: {np.sum(self.y == 0)} %%%%%%%")
+            # if self.verbose:
+            #     print(f"%%%%%%% Layer {i + 1} / {self.n_layers} has remaining y=1: {np.sum(self.y == 1)}, y=0: {np.sum(self.y == 0)} %%%%%%%")
                 # print("Chosen samples:", chosen_samples.shape)
                 # print(f"%%%%%%% Layer {i + 1} / {self.n_layers} has remaining y=1: {np.sum(self.y[chosen_samples] == 1)}, y=0: {np.sum(self.y[chosen_samples] == 0)} %%%%%%%")
 
@@ -189,7 +189,7 @@ class CascadeClassifier:
         files = glob.glob(more_neg_path + "/*.png")
         np.random.shuffle(files)
         cnt = 0
-        chosen_features = np.zeros((self.n_features, 0))
+        # chosen_features = np.zeros((self.n_features, 0))
         req_cnt_per_img = n_per_img
         for i in range(len(files)):
             img = cv2.imread(files[i])
@@ -198,14 +198,17 @@ class CascadeClassifier:
             features = face_detector.find_face_features(img, n_faces=req_cnt_per_img, by_confidence=by_confidence, by_size=by_size) 
 
             cnt += features.shape[1]
-            chosen_features = np.concatenate((chosen_features, features), axis=1)
+            self.X = np.concatenate((self.X, features), axis=1)
+            self.y = np.concatenate((self.y, np.zeros(features.shape[1], dtype=int)))
+            # chosen_features = np.concatenate((chosen_features, features), axis=1)
             if features.shape[1] < req_cnt_per_img: # keep rest for next image
                 req_cnt_per_img += req_cnt_per_img - features.shape[1]
             else:
                 req_cnt_per_img = n_per_img
             if cnt >= req_cnt:
                 break
-        return chosen_features, cnt # (n_features, min(cnt, req_cnt))
+        return cnt
+        # return chosen_features, cnt # (n_features, min(cnt, req_cnt))
 
 
     def predict(self,
