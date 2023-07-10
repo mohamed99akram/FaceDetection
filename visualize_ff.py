@@ -50,10 +50,10 @@ for j in range(0, 50): # images
         # print(f'Taking up to {i} classifiers out of {len(all_classifiers)}')
         # face_detector.feature_extractor.batch_size = 10000
         # # show rectangle
-        img_name = f'{str(j).zfill(3)}..png'
-        img_path = f'/home/akram/CMP4/GP/FF++/full_frames/{img_name}'
-        # img_name = f'{str(j).zfill(3)}/0.png'
-        # img_path=  f'../SBI2/data/FaceForensics++/original_sequences/youtube/c23/frames/{img_name}'
+        # img_name = f'{str(j).zfill(3)}..png'
+        # img_path = f'/home/akram/CMP4/GP/FF++/full_frames/{img_name}'
+        img_name = f'{str(j).zfill(3)}/0.png'
+        img_path=  f'../SBI2/data/FaceForensics++/original_sequences/youtube/c23/frames/{img_name}'
         # img_path=f'/home/akram/Pictures/Screenshots/Screenshot from 2023-07-05 12-23-01.png'
         img = cv2.imread(img_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -64,7 +64,8 @@ for j in range(0, 50): # images
             # # make gray
             gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
         else:
-            img = cv2.resize(img, (img.shape[1]//4, img.shape[0]//4))
+            img=cv2.resize(img,(250,250))
+            # img = cv2.resize(img, (img.shape[1]//4, img.shape[0]//4))
             # img = cv2.resize(img, (img.shape[1],img.shape[0]))
             # img = cv2.resize(img, (640, 350))
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
