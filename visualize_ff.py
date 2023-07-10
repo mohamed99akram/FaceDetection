@@ -37,7 +37,7 @@ import tqdm
 #                             )
 
 
-face_detector = joblib.load('hFeatures5_4/faceDetector.joblib')
+face_detector = joblib.load('hFeatures5_5/faceDetector.joblib')
 face_detector.max_size=500
 # all_classifiers = face_detector.classifier.strong_classifiers[0].weak_classifiers
 resized = False

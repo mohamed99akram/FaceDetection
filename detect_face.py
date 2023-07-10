@@ -144,6 +144,7 @@ def find_face(img: np.ndarray,
 
         # ++++++++++ normalize subwindows ++++++++++
         if normalize_subwindows:
+          subwindows = subwindows.to(torch.float32)
           # normalize mean, std
           subwindows = (subwindows - subwindows.mean(dim=(1,2), keepdim=True)) / subwindows.std(dim=(1,2), keepdim=True)
           # should be equivalent to cv2.normalize
@@ -286,11 +287,12 @@ class BaseFaceDetector:
     
     def normalize_sw(self, subwindows):
         # normalize mean, std
+        subwindows = subwindows.to(torch.float32)
         subwindows = (subwindows - subwindows.mean(dim=(1,2), keepdim=True)) / subwindows.std(dim=(1,2), keepdim=True)
         # should be equivalent to cv2.normalize
-        subwindows = (subwindows - subwindows.amin(dim=(1,2), keepdim=True)) / (subwindows.amax(dim=(1,2), keepdim=True) - subwindows.amin(dim=(1,2), keepdim=True)) 
+        subwindows = (subwindows - subwindows.amin(dim=(1,2), keepdim=True)) / (subwindows.amax(dim=(1,2), keepdim=True) - subwindows.amin(dim=(1,2), keepdim=True))
         # TODO i hate integers, make sure input is integers
-        subwindows = (subwindows* 255).to(torch.uint8) 
+        subwindows = (subwindows* 255).to(torch.uint8)
         return subwindows
     
     def extract_features(self, subwindows):
@@ -730,6 +732,7 @@ class FaceDetector:
 
             # ++++++++++ normalize subwindows ++++++++++
             if self.normalize_subwindows:
+                subwindows = subwindows.to(torch.float32)
                 # normalize mean, std
                 subwindows = (subwindows - subwindows.mean(dim=(1,2), keepdim=True)) / subwindows.std(dim=(1,2), keepdim=True)
                 # should be equivalent to cv2.normalize
