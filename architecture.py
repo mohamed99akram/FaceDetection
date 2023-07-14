@@ -17,7 +17,13 @@ class Architecture:
     X: features of the training data (n_features, n_samples)
     y: labels of the training data (n_samples,)
     """
-    def __init__(self, X, y, Ftarget=0.07, f=0.6, d=0.94, v_size=0.3, verbose=False, maxperlayer=200, maxlayers=10, *args, **kwargs):
+    def __init__(self, 
+                 X, y, 
+                 Ftarget=0.07, f=0.6, d=0.94, v_size=0.3, 
+                 verbose=False, 
+                 maxperlayer=200, maxlayers=10, 
+                 batchsize=1000, delete_unused=False, equal_weights=False,
+                 *args, **kwargs):
         self.Ftarget = Ftarget
         self.f = f
         self.d = d
@@ -30,6 +36,10 @@ class Architecture:
         self.v_size = v_size
         self.maxperlayer = maxperlayer
         self.maxlayers = maxlayers
+        self.batchsize = batchsize
+        self.delete_unused = delete_unused
+        self.equal_weights = equal_weights
+
         
 
         self.strong_classifiers: List[StrongClassifier] = []
@@ -51,7 +61,9 @@ class Architecture:
         ## D0 = 1.0
         D1 = 1.0 ##
         i = 0 # layer number        
-        cascaded_classifier = CascadeClassifier(self.X_train, self.y_train, verbose=self.verbose)
+        cascaded_classifier = CascadeClassifier(self.X_train, self.y_train, 
+                                                verbose=self.verbose, layers=[], 
+                                                batchsize=self.batchsize, use_stored=False, *args, **kwargs)
         
         ## while F0 > self.Ftarget:
         while F1 > self.Ftarget:##
@@ -63,7 +75,9 @@ class Architecture:
             F0 = F1 ##
             D0 = D1 ##
             last_strong_classifier = None
-            strong_classifier_chooser = StrongClassifierChooser(self.X_train, self.y_train, n_i, verbose=self.verbose)
+            strong_classifier_chooser = StrongClassifierChooser(self.X_train, self.y_train, n_i, verbose=self.verbose , 
+                                                                batchsize=self.batchsize, delete_unused=self.delete_unused, 
+                                                                equal_weights=self.equal_weights, *args, **kwargs)
             while F1 > self.f * F0:
                 n_i += 1
 
@@ -147,6 +161,9 @@ class Architecture:
 
         if self.verbose:
             print("Architecture built")
+
+        for strong_classifier in self.strong_classifiers:
+            cascaded_classifier.layers.append(strong_classifier.T)
             
         return cascaded_classifier
 
