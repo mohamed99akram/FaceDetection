@@ -3,6 +3,10 @@ from cascade import CascadeClassifier
 from strong_classifier import StrongClassifier, StrongClassifierChooser
 import numpy as np
 from sklearn.model_selection import train_test_split
+import cv2
+import glob
+from tqdm import tqdm
+
 class Architecture:
     """
     Build architecture of a cascade for a given:
@@ -13,7 +17,7 @@ class Architecture:
     X: features of the training data (n_features, n_samples)
     y: labels of the training data (n_samples,)
     """
-    def __init__(self, X, y, Ftarget=0.07, f=0.6, d=0.94, v_size=0.3, verbose=False, maxperlayer=200):
+    def __init__(self, X, y, Ftarget=0.07, f=0.6, d=0.94, v_size=0.3, verbose=False, maxperlayer=200, maxlayers=10, *args, **kwargs):
         self.Ftarget = Ftarget
         self.f = f
         self.d = d
@@ -25,13 +29,22 @@ class Architecture:
 
         self.v_size = v_size
         self.maxperlayer = maxperlayer
+        self.maxlayers = maxlayers
+        
 
         self.strong_classifiers: List[StrongClassifier] = []
         self.verbose = verbose
 
-    def build(self):
+    def build(self,
+              more_neg_path: str = None,
+              *args, **kwargs):
         """
         Build the architecture of the cascade
+        input:
+            more_neg_path: path to directory of negative samples
+            kwargs: arguments for FaceDetectorFeatures
+        output:
+            cascaded_classifier: the cascade classifier
         """
         ## F0 = 1.0 
         F1 = 1.0 ##
@@ -84,6 +97,7 @@ class Architecture:
                     print(f"False positive rate: {F1}, required false positive rate: {self.f * F0}")
                
                 # update D1: TP / total number of positive samples
+                # TODO use cascaded_classifier or strong_classifier or it doesn't matter?
                 ## D0_temp = np.sum((strong_classifier.predict(self.X_val) == 1) & (self.y_val == 1)) / np.sum(self.y_val == 1)
                 D1_temp = np.sum((strong_classifier.predict(self.X_val) == 1) & (self.y_val == 1)) / np.sum(self.y_val == 1)
                 if self.verbose:
@@ -108,13 +122,27 @@ class Architecture:
                 if remaining_neg == 0:
                     print("No negative samples left")
                     break
+                size_before = self.X_train.shape[1]
                 self.X_train = self.X_train[:, remaining_bool_train]
                 self.y_train = self.y_train[remaining_bool_train]
                 self.X_val = self.X_val[:, remaining_bool_val]
                 self.y_val = self.y_val[remaining_bool_val]
-                
+
+                if more_neg_path is not None:
+                    zeros_cnt = np.sum(self.y_train == 0)
+                    req_cnt = kwargs.get('req_cnt', 6000)
+                    req_cnt = req_cnt - zeros_cnt
+                    kwargs['req_cnt'] = req_cnt
+
+                    self.getMoreNeg(more_neg_path, *args, **kwargs)
+                    print(f"Added {self.X_train.shape[1] - size_before} negative samples")
+
             if self.verbose:
                 print(f"Layer {i} built, false positive rate: {F0}, detection rate: {D0}, number of classifiers: {n_i}")
+            
+            if i >= self.maxlayers:
+                print("Max number of layers reached, F1: ", F1)
+                break
 
 
         if self.verbose:
@@ -122,6 +150,62 @@ class Architecture:
             
         return cascaded_classifier
 
+    def getMoreNeg(self, 
+                   more_neg_path: str, 
+                   n_per_img: int = 6,
+                   resize_factor: float = 1,
+                   req_cnt: int = 6000,
+                   by_confidence: bool = False,
+                   by_size: bool = False,
+                   *args, **kwargs):
+        """
+        Get more negative samples from more_neg_path
+        negative samples are from non-faces directory that are classified as faces (false positives)
+        input:
+            more_neg_path: path to directory of negative samples
+            n_per_img: number of negative samples to get from each image   
+            req_cnt: required number of negative samples
+            by_confidence: if True, get negative samples by confidence
+            by_size: if True, get negative samples by size
+            kwargs: arguments for FaceDetectorFeatures
+        output:
+            chosen_features: chosen negative samples
+        """
+        from detect_face import FaceDetectorFeatures
+        face_detector = FaceDetectorFeatures(*args, **kwargs)
+        # shuffle files
+        files = glob.glob(more_neg_path + "/*.png")
+        np.random.shuffle(files)
+        cnt = 0
+        # chosen_features = np.zeros((self.n_features, 0))
+        req_cnt_per_img = n_per_img
+        for i in tqdm(range(len(files)), desc='Images', colour='yellow'):
+            img = cv2.imread(files[i])
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            img = cv2.resize(img, (int(img.shape[1] * resize_factor), int(img.shape[0] * resize_factor)))
+            features = face_detector.find_face_features(img, n_faces=req_cnt_per_img, by_confidence=by_confidence, by_size=by_size)  # (n_features, n_faces)
+
+            # split to train and val
+            features_train, features_val = train_test_split(features.T, test_size=self.v_size, random_state=42)
+            features_train = features_train.T
+            features_val = features_val.T
+
+            # add to X_train, y_train, X_val, y_val
+            self.X_train = np.concatenate((self.X_train, features_train), axis=1)
+            self.y_train = np.concatenate((self.y_train, np.zeros(features_train.shape[1])), axis=0, dtype=int)
+            self.X_val = np.concatenate((self.X_val, features_val), axis=1)
+            self.y_val = np.concatenate((self.y_val, np.zeros(features_val.shape[1])), axis=0, dtype=int)
+            cnt += features.shape[1]
+            if cnt >= req_cnt: 
+                break
+
+            if features.shape[1] < req_cnt_per_img:
+                req_cnt_per_img += req_cnt_per_img - features.shape[1]
+            else:
+                req_cnt_per_img = n_per_img
+
+        return cnt
+            
         
 
     
