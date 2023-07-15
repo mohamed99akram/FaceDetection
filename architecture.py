@@ -63,7 +63,7 @@ class Architecture:
         i = 0 # layer number        
         cascaded_classifier = CascadeClassifier(self.X_train, self.y_train, 
                                                 verbose=self.verbose, layers=[], 
-                                                batchsize=self.batchsize, use_stored=False, *args, **kwargs)
+                                                batchsize=self.batchsize, use_stored=False)
         
         ## while F0 > self.Ftarget:
         while F1 > self.Ftarget:##
@@ -77,7 +77,7 @@ class Architecture:
             last_strong_classifier = None
             strong_classifier_chooser = StrongClassifierChooser(self.X_train, self.y_train, n_i, verbose=self.verbose , 
                                                                 batchsize=self.batchsize, delete_unused=self.delete_unused, 
-                                                                equal_weights=self.equal_weights, *args, **kwargs)
+                                                                equal_weights=self.equal_weights)
             while F1 > self.f * F0:
                 n_i += 1
 
@@ -150,9 +150,10 @@ class Architecture:
                     req_cnt = kwargs.get('req_cnt', 6000)
                     req_cnt = req_cnt - zeros_cnt
                     kwargs['req_cnt'] = req_cnt
+                    kwargs['classifier'] = cascaded_classifier
 
-                    self.getMoreNeg(more_neg_path, *args, **kwargs)
-                    print(f"Added {self.X_train.shape[1] - size_before} negative samples")
+                    ret_cnt = self.getMoreNeg(more_neg_path, *args, **kwargs)
+                    print(f"Added {ret_cnt} negative samples")
 
             if self.verbose:
                 print(f"Layer {i} built, false positive rate: {F0}, detection rate: {D0}, number of classifiers: {n_i}")
@@ -166,7 +167,7 @@ class Architecture:
             print("Architecture built")
 
         for strong_classifier in self.strong_classifiers:
-            cascaded_classifier.layers.append(strong_classifier.T)
+            cascaded_classifier.layers.append(len(strong_classifier.weak_classifiers))
             
         return cascaded_classifier
 
@@ -204,17 +205,22 @@ class Architecture:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             img = cv2.resize(img, (int(img.shape[1] * resize_factor), int(img.shape[0] * resize_factor)))
             features = face_detector.find_face_features(img, n_faces=req_cnt_per_img, by_confidence=by_confidence, by_size=by_size)  # (n_features, n_faces)
+            if features.shape[1] == 0:
+                continue
+            if features.shape[1] > 1:
 
-            # split to train and val
-            features_train, features_val = train_test_split(features.T, test_size=self.v_size, random_state=42)
-            features_train = features_train.T
-            features_val = features_val.T
+                # split to train and val
+                features_train, features_val = train_test_split(features.T, test_size=self.v_size, random_state=42)
+                features_train = features_train.T
+                features_val = features_val.T
+                self.X_val = np.concatenate((self.X_val, features_val), axis=1)
+                self.y_val = np.concatenate((self.y_val, np.zeros(features_val.shape[1], dtype=int)), axis=0)
+            else:
+                features_train = features
 
             # add to X_train, y_train, X_val, y_val
             self.X_train = np.concatenate((self.X_train, features_train), axis=1)
-            self.y_train = np.concatenate((self.y_train, np.zeros(features_train.shape[1])), axis=0, dtype=int)
-            self.X_val = np.concatenate((self.X_val, features_val), axis=1)
-            self.y_val = np.concatenate((self.y_val, np.zeros(features_val.shape[1])), axis=0, dtype=int)
+            self.y_train = np.concatenate((self.y_train, np.zeros(features_train.shape[1], dtype=int)), axis=0)
             cnt += features.shape[1]
             if cnt >= req_cnt: 
                 break
