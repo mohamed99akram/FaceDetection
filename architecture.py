@@ -88,23 +88,26 @@ class Architecture:
                 strong_classifier = strong_classifier_chooser.train(n_i - 1)
                 # TODO check if use cascade_classifier or strong_classifier
                 confidence = strong_classifier.confidence(self.X_val)
-                requiredD = self.d * D0
-                a_con = np.argsort(confidence)
-                a_con = a_con[::-1]
-                # get first index where sum of y[a_con[:i]] >= requiredD using accumulative sum
-                y_acc = np.cumsum(self.y_val[a_con]) / np.sum(self.y_val)
-                idx = np.argmax(y_acc >= requiredD) # first index where y_acc >= requiredD
-                # make threshold average of confidence of idx and idx - 1
-                # TODO check if this is correct
-                ## if idx == 0:
-                ##     threshold = confidence[a_con[idx]] - 0.01 # make sure it is smaller than the smallest confidence
-                if idx == len(a_con) - 1:
-                    threshold = confidence[a_con[idx]] - 0.01
-                else:
-                    ## threshold = (confidence[a_con[idx]] + confidence[a_con[idx - 1]]) / 2
-                    threshold = (confidence[a_con[idx]] + confidence[a_con[idx + 1]]) / 2
-                    
-                strong_classifier.θ = threshold
+                cur_preds = confidence >= strong_classifier.θ
+                D1_temp = np.sum((cur_preds == 1) & (self.y_val == 1)) / np.sum(self.y_val == 1)
+                if D1_temp < D0 * self.d:
+                    requiredD = self.d * D0
+                    a_con = np.argsort(confidence)
+                    a_con = a_con[::-1]
+                    # get first index where sum of y[a_con[:i]] >= requiredD using accumulative sum
+                    y_acc = np.cumsum(self.y_val[a_con]) / np.sum(self.y_val)
+                    idx = np.argmax(y_acc >= requiredD) # first index where y_acc >= requiredD
+                    # make threshold average of confidence of idx and idx - 1
+                    # TODO check if this is correct
+                    ## if idx == 0:
+                    ##     threshold = confidence[a_con[idx]] - 0.01 # make sure it is smaller than the smallest confidence
+                    if idx == len(a_con) - 1:
+                        threshold = confidence[a_con[idx]] - 0.01
+                    else:
+                        ## threshold = (confidence[a_con[idx]] + confidence[a_con[idx - 1]]) / 2
+                        threshold = (confidence[a_con[idx]] + confidence[a_con[idx + 1]]) / 2
+                        
+                    strong_classifier.θ = threshold
                 # update F1: FP / total number of negative samples
                 F1 = np.sum((strong_classifier.predict(self.X_val) == 1) & (self.y_val == 0)) / np.sum(self.y_val == 0)
                 if self.verbose:
