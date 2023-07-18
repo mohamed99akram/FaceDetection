@@ -55,7 +55,7 @@ def get_subwindows(img: torch.Tensor or np.ndarray, size: Tuple, stride: int, de
     # get subwindows' coordinates
     x = torch.arange(0, width - wnd_w + 1, stride)
     y = torch.arange(0, height - wnd_h + 1, stride)
-    x, y = torch.meshgrid(x, y)
+    x, y = torch.meshgrid(x, y, indexing='xy')
     x = x.reshape(-1)
     y = y.reshape(-1)
     coordinates = torch.stack((x, y), dim=1)  # (n_subwindows, 2)

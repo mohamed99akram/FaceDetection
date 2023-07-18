@@ -31,7 +31,7 @@
   - [ ] `_idx2f_desc()` seems useful, (memoize? embedded systems?)
   - [ ] try to edit cascade.py to train one strong classifier and use parts of it in differnt layers
       - (if an image is not a face by using 3 weak classifiers, then it is still not a face using 200?)
-
+  - [ ] resize image itself by scale factor rather than resizing each subwindow.
 --------------
 README.md
 
