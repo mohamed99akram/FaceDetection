@@ -2,44 +2,14 @@ import joblib
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-from detect_face import FaceDetector
+from detect_face import FaceDetector, MinFaceDetector
 import torch
 import tqdm
 import glob
 from random import shuffle
-# class FaceDetectionModel:
-#     '''
-#     Class for the Face Detection Model.
-#     '''
-#     def __init__(self, classifier_path, face_detector_model_path, feature_extractor_path):
-#         self.face_detector = FaceDetector(face_detector_model_path)
-# load hFeatures6/faceDetector.joblib
 
-
-# classifier = joblib.load('hFeatures6/cascadeClassifier.joblib')
-# feature_extractor = joblib.load('hFeatures6/feature_extractor.joblib')
-
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# faceDetector = FaceDetector(classifier, \
-#                             feature_extractor,\
-
-#                             window_size=(24, 24),\
-#                             scale_dist=1.1,
-#                             max_size=300,
-#                             stride=5,
-
-#                             device=device,
-#                             use_percentile=False,
-#                             makeθ0=False,
-
-#                             verbose=False,
-#                             normalize_subwindows=False,
-#                             report_time=True,
-#                             use_sklearn=False
-#                             )
-
-
-face_detector = joblib.load('hFeatures6/faceDetector3.joblib')
+face_detector:MinFaceDetector = joblib.load('hFeatures6/faceDetector3.joblib')
+face_detector.setup_device()
 print(face_detector.min_size)
 print(face_detector.stride)
 # face_detector.min_size=24
@@ -82,7 +52,7 @@ for j in range(0, 50): # images
             gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
         else:
             # img=cv2.resize(img,(250,250))
-            # img = cv2.resize(img, (img.shape[1]//3, img.shape[0]//3))
+            img = cv2.resize(img, (img.shape[1], img.shape[0]))
             # img = cv2.resize(img, (img.shape[1], img.shape[0]))
             # img = cv2.resize(img, (img.shape[1],img.shape[0]))
             # img = cv2.resize(img, (640, 350))

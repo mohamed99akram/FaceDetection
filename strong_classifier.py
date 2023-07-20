@@ -131,6 +131,7 @@ class StrongClassifierChooser:
         It is the layer of the cascade classifier
 
         TODO does self.X make it slower or more memory required?
+        TODO pass X, y to train instead of initializing them here
         """
         self.X = X
         self.y = y

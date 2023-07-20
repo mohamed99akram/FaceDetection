@@ -319,7 +319,10 @@ class BaseFaceDetector:
     def update_device(self, device):self.device = device
     def update_normalize_subwindows(self, normalize_subwindows):self.normalize_subwindows = normalize_subwindows
     def update_calc_conf(self, calc_conf):self.calc_conf = calc_conf
-    
+    def setup_device(self, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+        self.device = device
+        self.classifier.device = device
+        self.feature_extractor.device = device
 
     def find_face(self,img: np.ndarray,):
         """
@@ -364,22 +367,21 @@ class BaseFaceDetector:
 
             # ++++++++++ Predict ++++++++++
             predictions = self.predict(t_features, t_f_idx_map)
-            tasks_times[4] += time.time() - start; start = time.time()
 
             # ++++++++++ get face coordinates ++++++++++
             tmp_tuple = np.concatenate((coordinates[predictions == 1], coordinates[predictions == 1] + torch.tensor(current_size)), axis=1)
             face_coordinates = np.concatenate((face_coordinates, tmp_tuple), axis=0)
-            tasks_times[5] += time.time() - start; start = time.time()
+
 
             # +++++++++ get max confidence +++++++++
             if self.calc_conf:
                 region_max_conf, max_confidence = self.max_confidence(t_features, t_f_idx_map, region_max_conf, max_confidence, coordinates, current_size)
-            tasks_times[5] += time.time() - start; start = time.time()
+            tasks_times[4] += time.time() - start; start = time.time()
 
             # ++++++++++ update current_size ++++++++++
             current_size = int(current_size[0] / self.scale_dist), int(current_size[1] / self.scale_dist)
 
-
+        tasks_times[5] = np.sum(tasks_times)
         return face_coordinates, region_max_conf, max_confidence, dict(zip(tasks, tasks_times))
 
 class SklearnFaceDetector(BaseFaceDetector):
@@ -556,29 +558,8 @@ class FaceDetectorFeatures(BaseFaceDetector):
                 # weights[-total_predictions:] *= current_size[0]
 
             weights = np.concatenate((weights, cur_weights), axis=0)
-            
-            # t_features = t_features[:, predictions == 1]
-            # choose from t_features n_faces
-            # if t_features.shape[1] > n_faces:
-            #     indices = np.random.choice(t_features.shape[1], n_faces, replace=False, p=cur_weights.flatten()/np.sum(cur_weights))
-                # t_features = t_features[:, np.random.choice(t_features.shape[1], n_faces, replace=False, p=cur_weights/np.sum(cur_weights))]
-            # else:
-            #     indices = np.arange(t_features.shape[1])
-
-            # t_features = t_features[:, indices]
-            # predictions = predictions[indices]
-            # coordinates = coordinates[indices]
-            # weights = np.concatenate((weights, cur_weights[indices]), axis=0)
-            # TODO is this correct?
-            # chosen_features = np.concatenate((chosen_features, t_features), axis=1)
-            
 
             current_size = int(current_size[0] / self.scale_dist), int(current_size[1] / self.scale_dist)
-
-        # randomly select n_faces subwindows from chosen_features
-        # if chosen_features.shape[1] > n_faces:
-        #     chosen_features = chosen_features[:, np.random.choice(chosen_features.shape[1], n_faces, replace=False, p=weights.flatten()/np.sum(weights))]
-        # return chosen_features # (n_features, min(n_faces, chosen_features.shape[1]))
 
         # randomly select n_faces subwindows from face_coordinates
         if face_coordinates.shape[0] > n_faces:
@@ -587,7 +568,6 @@ class FaceDetectorFeatures(BaseFaceDetector):
         
         # extract features from face_coordinates
         subwindows = self.get_subwindows_from_coordinates(img, face_coordinates)
-        # subwindows = self.resize_sw(subwindows) # needed?
         if self.normalize_subwindows:
             subwindows = self.normalize_sw(subwindows)
         t_f_idx_map, t_features = self.extract_features2(subwindows) # t_features: (n_features, n_subwindows)

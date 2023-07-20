@@ -22,12 +22,11 @@ class Architecture:
                  Ftarget=0.07, f=0.6, d=0.94, v_size=0.3, 
                  verbose=False, 
                  maxperlayer=200, maxlayers=10, 
-                 batchsize=1000, delete_unused=False, equal_weights=False,
-                 *args, **kwargs):
+                 batchsize=1000, delete_unused=False, equal_weights=False,):
         self.Ftarget = Ftarget
         self.f = f
         self.d = d
-        
+        # TODO make val_bool, train_bool instead of dividing X, y
         self.X_train, self.X_val, self.y_train, self.y_val = train_test_split(X.T, y, test_size=v_size, stratify=y, random_state=42)
         self.X_train = self.X_train.T
         self.X_val = self.X_val.T
@@ -45,17 +44,15 @@ class Architecture:
         self.strong_classifiers: List[StrongClassifier] = []
         self.verbose = verbose
 
-    def build(self,
-              more_neg_path: str = None,
-              *args, **kwargs):
+    def build(self,more_neg_dict=None):
         """
         Build the architecture of the cascade
         input:
-            more_neg_path: path to directory of negative samples
-            kwargs: arguments for FaceDetectorFeatures
+            more_neg_dict: dictionary of arguments for getMoreNeg
         output:
             cascaded_classifier: the cascade classifier
         """
+        # TODO divide into subfunctions for readability
         ## F0 = 1.0 
         F1 = 1.0 ##
         ## D0 = 1.0
@@ -145,14 +142,14 @@ class Architecture:
                 self.X_val = self.X_val[:, remaining_bool_val]
                 self.y_val = self.y_val[remaining_bool_val]
 
-                if more_neg_path is not None:
+                if more_neg_dict is not None:
                     zeros_cnt = np.sum(self.y_train == 0)
-                    req_cnt = kwargs.get('req_cnt', 6000)
+                    req_cnt = more_neg_dict.get('req_cnt', 6000)
                     req_cnt = req_cnt - zeros_cnt
-                    kwargs['req_cnt'] = req_cnt
-                    kwargs['classifier'] = cascaded_classifier
+                    more_neg_dict['req_cnt'] = req_cnt
+                    more_neg_dict['classifier'] = cascaded_classifier
 
-                    ret_cnt = self.getMoreNeg(more_neg_path, *args, **kwargs)
+                    ret_cnt = self.getMoreNeg(**more_neg_dict)
                     print(f"Added {ret_cnt} negative samples")
 
             if self.verbose:
@@ -178,7 +175,7 @@ class Architecture:
                    req_cnt: int = 6000,
                    by_confidence: bool = False,
                    by_size: bool = False,
-                   *args, **kwargs):
+                   face_dict:dict=None,):
         """
         Get more negative samples from more_neg_path
         negative samples are from non-faces directory that are classified as faces (false positives)
@@ -188,12 +185,12 @@ class Architecture:
             req_cnt: required number of negative samples
             by_confidence: if True, get negative samples by confidence
             by_size: if True, get negative samples by size
-            kwargs: arguments for FaceDetectorFeatures
+            face_dict: dictionary of arguments for FaceDetectorFeatures
         output:
             chosen_features: chosen negative samples
         """
         from detect_face import FaceDetectorFeatures
-        face_detector = FaceDetectorFeatures(*args, **kwargs)
+        face_detector = FaceDetectorFeatures(**face_dict)
         # shuffle files
         files = glob.glob(more_neg_path + "/*.png")
         np.random.shuffle(files)
@@ -210,6 +207,7 @@ class Architecture:
             if features.shape[1] > 1:
 
                 # split to train and val
+                # TODO make val_bool, train_bool instead of dividing 
                 features_train, features_val = train_test_split(features.T, test_size=self.v_size, random_state=42)
                 features_train = features_train.T
                 features_val = features_val.T
