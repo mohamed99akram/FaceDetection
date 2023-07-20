@@ -8,7 +8,7 @@ import tqdm
 import glob
 from random import shuffle
 
-face_detector:MinFaceDetector = joblib.load('hFeatures6/faceDetector3.joblib')
+face_detector:MinFaceDetector = joblib.load('hFeatures5_6/faceDetector.joblib')
 face_detector.setup_device()
 print(face_detector.min_size)
 print(face_detector.stride)
@@ -31,7 +31,7 @@ for j in range(0, 50): # images
     for i in [80]: # number of classifiers
         # face_detector.classifier.strong_classifiers[0].weak_classifiers = all_classifiers[:i]
         print(face_detector.classifier.strong_classifiers[0].θ)
-        face_detector.classifier.strong_classifiers[0].θ = 55
+        # face_detector.classifier.strong_classifiers[0].θ = 55
         # print(f'Taking up to {i} classifiers out of {len(all_classifiers)}')
         # face_detector.feature_extractor.batch_size = 10000
         # # show rectangle
