@@ -1,41 +1,43 @@
 - Training
-  - [ ] X is copied multiple times in classifier.py, so it is better to make it a global variable??
+  - [ ] X is copied multiple times in classifier.py (X.type(float32)), so it is better to make it a global variable?? [x] done in cascade, but not in classifier
   - [ ] Build architecture like the paper to deduce T, layers count
   - [x] Train a hard dataset
   - [ ] How to make processing features in batches, each batch from a different file?
   - [ ] Implement f value on GPU (chosing 10%)
-  - [ ] train 24x24 without percentile
+  - [x] train 24x24 without percentile
   - [ ] try removing outliers?
-  - [ ] Train with Adaboost from sklearn
+  - [x] Train with Adaboost from sklearn
   - [ ] adaboost with decision tree instead of stump
   - [ ] Train full cascade
   - [ ] torch.ensemble.AdaBoostClassifier
   - [ ] cuML
   - [ ] increase percentage of nonfaces (5 times number of faces?)
+  - [ ] Get data from gdown if colab instead of manually copying it 
 --------------
 - Testing
   - [x] Test using chosen features only 
     - [x] Pass exact needed feature for each image instead of all features for each image
       - [x] This needs to be different in `classifier.py` than in `strong_classifier.py`, than in `cascade.py`
-      - [ ] Optimize it
+      - [x] Optimize it
   - [x] Detect face in a general image (subwindows, scaling)
   - [ ] Detect faces in a video
   - [x] Normalize faces? (μ, σ)
   - [ ] Delete `Please Call chooseClassifier() first` warning?
   - [ ] make inference faster using paper's method
-  - [ ] test on multiple faces in the same image
+  - [x] test on multiple faces in the same image
   - [ ] Play with threshold of the classifier to minimize false positives
-  - [ ] remove dictionaries, they seem to be slow
-  - [ ] memoize what you can in `feature_extractor.py`
+  - [x] remove dictionaries, they seem to be slow
+  - [x] memoize what you can in `feature_extractor.py`
   - [ ] `getChosenIndecies` needs to be optimized?
-  - [ ] `_idx2f_desc()` seems useful, (memoize? embedded systems?)
+  - [x] `_idx2f_desc()` seems useful, (memoize? embedded systems?)
   - [ ] try to edit cascade.py to train one strong classifier and use parts of it in differnt layers
       - (if an image is not a face by using 3 weak classifiers, then it is still not a face using 200?)
   - [ ] resize image itself by scale factor rather than resizing each subwindow.
+  - [ ] merge subwindows that are close to each other (IoU)
 --------------
 README.md
 
 --------------
-- [ ] Refactor code
-- [ ] cpu instead of gpu
+- [x] Refactor code
+- [x] cpu instead of gpu
 - [ ] num_workers in dataloader

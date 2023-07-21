@@ -3,6 +3,7 @@
 # feature extraction (trainig)
 # feature extraction (testing)
 # feature extraction (image)
+# TODO there is potential for refactoring
 import numpy as np
 import torch
 from torch.utils.data import Dataset
